@@ -135,111 +135,84 @@ class PopenTests(TestCaseBase):
             pl.write(line)
         fh.close()
     
-    def XX_testWrite(self):
-        outf = self.getOutputFile(".out")
-        outfGz = self.getOutputFile(".out.gz")
-
-        po = Popen(("gzip", "-1"), "w", otherEnd=outfGz)
-        self.cpFileToPl("simple1.txt", po)
-        po.close()
-
-        Pipeline(("zcat", outfGz), stdout=outf).wait()
-        self.diffExpected(".out")
-
-    def BROKEN_testWriteFile(self):
-        outf = self.getOutputFile(".out")
-        outfGz = self.getOutputFile(".out.gz")
-
-        with open(outfGz, "w") as outfGzFh:
-            pl = Pipeline(("gzip", "-1"), "w", otherEnd=outfGzFh)
-            self.cpFileToPl("simple1.txt", pl)
-            pl.wait()
-
-        procOps.runProc(("zcat", outfGz), stdout=outf)
-        self.diffExpected(".out")
-
-    def XX_testWriteMult(self):
-        outf = self.getOutputFile(".wc")
-
-        # grr, BSD wc adds an extract space, so just convert to tabs
-        pl = Pipeline((("gzip", "-1"),
-                       ("gzip", "-dc"),
-                       ("wc",),
-                       ("sed", "-e", "s/  */\t/g")),
-                      "w", otherEnd=outf)
-        self.cpFileToPl("simple1.txt", pl)
-        pl.wait()
-
-        self.diffExpected(".wc")
-
-    def XX_cpPlToFile(self, pl, outExt):
+    def cpPlToFile(self, pl, outExt):
         outf = self.getOutputFile(outExt)
         fh = open(outf, "w")
         for line in pl:
             fh.write(line)
         fh.close()
     
-    def XX_testRead(self):
+    def testWrite(self):
+        outf = self.getOutputFile(".out")
+        outfGz = self.getOutputFile(".out.gz")
+
+        po = Popen(("gzip", "-1"), "w", other=outfGz)
+        self.cpFileToPl("simple1.txt", po)
+        po.close()
+
+        Pipeline(("zcat", outfGz), stdout=outf).wait()
+        self.diffExpected(".out")
+
+    def testWriteFile(self):
+        outf = self.getOutputFile(".out")
+        outfGz = self.getOutputFile(".out.gz")
+
+        with open(outfGz, "w") as outfGzFh:
+            pl = Popen(("gzip", "-1"), "w", other=outfGzFh)
+            self.cpFileToPl("simple1.txt", pl)
+            pl.wait()
+
+        Pipeline(("zcat", outfGz), stdout=outf).wait()
+        self.diffExpected(".out")
+
+    def testWriteMult(self):
+        outf = self.getOutputFile(".wc")
+
+        # grr, BSD wc adds an extract space, so just convert to tabs
+        pl = Popen((("gzip", "-1"),
+                       ("gzip", "-dc"),
+                       ("wc",),
+                       ("sed", "-e", "s/  */\t/g")),
+                      "w", other=outf)
+        self.cpFileToPl("simple1.txt", pl)
+        pl.wait()
+
+        self.diffExpected(".wc")
+
+    def testRead(self):
         inf = self.getInputFile("simple1.txt")
         infGz = self.getOutputFile(".txt.gz")
-        procOps.runProc(("gzip", "-c", inf), stdout=infGz)
+        Pipeline(("gzip", "-c", inf), stdout=infGz).wait()
 
-        pl = Pipeline(("gzip", "-dc"), "r", otherEnd=infGz)
+        pl = Popen(("gzip", "-dc"), "r", other=infGz)
         self.cpPlToFile(pl, ".out")
         pl.wait()
 
         self.diffExpected(".out")
 
-    def XX_testReadMult(self):
+    def testReadMult(self):
         inf = self.getInputFile("simple1.txt")
 
-        pl = Pipeline((("gzip","-1c"),
+        pl = Popen((("gzip","-1c"),
                        ("gzip", "-dc"),
                        ("wc",),
                        ("sed", "-e", "s/  */\t/g")),
-                      "r", otherEnd=inf)
+                      "r", other=inf)
         self.cpPlToFile(pl, ".wc")
         pl.wait()
 
         self.diffExpected(".wc")
 
-    def XXtestPassRead(self):
-        "using FIFO to pass pipe to another process for reading"
-        # FIXME: should this be supported somehow
-        inf = self.getInputFile("simple1.txt")
-        infGz = self.getOutputFile(".txt.gz")
-        cpOut = self.getOutputFile(".out")
-        procOps.runProc(("gzip", "-c", inf), stdout=infGz)
-
-        pl = Pipeline(("gzip", "-dc"), "r", otherEnd=infGz)
-        procOps.runProc(["cat"],  stdin=pl.pipePath, stdout=cpOut)
-        pl.wait()
-
-        self.diffExpected(".out")
-
-    def XXtestPassWrite(self):
-        "using FIFO to pass pipe to another process for writing"
-        # FIXME: should this be supported somehow
-        inf = self.getInputFile("simple1.txt")
-        outf = self.getOutputFile(".out")
-        pipePath = self.getOutputFile(".fifo")
-
-        pl = Pipeline(("sort", "-r"), "w", otherEnd=outf, pipePath=pipePath)
-        procOps.runProc(["cat"],  stdin=inf, stdout=pl.pipePath)
-        pl.wait()
-
-        self.diffExpected(".out")
-
-    def XX_testExitCode(self):
-        pl = Pipeline(("false",))
-        with self.assertRaisesRegexp(ProcException, "^x$") as cm:
+    def testExitCode(self):
+        pl = Popen(("false",))
+        with self.assertRaisesRegexp(ProcException, "^process exited 1: false$") as cm:
             pl.wait()
         for p in pl.procs:
             self.assertTrue(p.returncode == 1)
 
-    def XX_testSigPipe(self):
+    def testSigPipe(self):
         "test not reading all of pipe output"
-        pl = Pipeline([("yes",), ("true",)], "r")
+        pl = Popen([("yes",), ("true",)], "r")
         pl.wait()
         
 def suite():
