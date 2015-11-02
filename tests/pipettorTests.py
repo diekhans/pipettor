@@ -50,6 +50,17 @@ class PipelineTests(TestCaseBase):
             pl.wait()
         self.commonChecks(nopen, pl, "sleep 1 | false")
 
+    def testTrivialStatus(self):
+        nopen = self.numOpenFiles()
+        pl = Pipeline(("true",))
+        pl.start()
+        self.assertTrue(pl.running)
+        self.assertFalse(pl.finished)
+        pl.wait()
+        self.assertFalse(pl.running)
+        self.assertTrue(pl.finished)
+        self.commonChecks(nopen, pl, "true")
+
     def testSimplePipe(self):
         nopen = self.numOpenFiles()
         pl = Pipeline([("true",), ("true",)])

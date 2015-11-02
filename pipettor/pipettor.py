@@ -632,8 +632,9 @@ class Pipeline(object):
         self.devs = set()
         self.pgid = None      # process group leader
         self.bypid = dict()   # indexed by pid
-        self.started = False  # have procs been started
-        self.finished = False # have all procs finished
+        self.started = False  # have processes been started
+        self.running = False  # processes are running (or wait has not been called)
+        self.finished = False # have all processes finished
 
         if isinstance(cmds[0], str):
             cmds = [cmds]  # one-process pipeline
@@ -720,6 +721,7 @@ class Pipeline(object):
     def __finish(self):
         "finish up when no errors have occurred"
         self.finished = True
+        self.running = False
         for d in self.devs:
             d.close()
 
@@ -742,6 +744,7 @@ class Pipeline(object):
     def __error_cleanup(self):
         """forced cleanup of child processed after failure"""
         self.finished = True
+        self.running = False
         for d in self.devs:
             self.__error_cleanup_dev(d)
         for p in self.procs:
@@ -749,8 +752,8 @@ class Pipeline(object):
 
     def start(self):
         """start processes"""
-        # FIXME: need non-error here for wait/poll
         self.started = True
+        self.running = True
         # clean up devices and process if there is a failure
         try:
             self.__start()
