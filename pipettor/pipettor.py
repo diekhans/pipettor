@@ -2,6 +2,7 @@
 """
 Robust, easy to use Unix process pipelines.
 """
+from __future__ import print_function
 import os
 import re
 import sys
@@ -16,7 +17,6 @@ import pickle
 import time
 import pipes
 from cStringIO import StringIO
-
 
 # Why better that subprocess:
 #   - natural pipeline
@@ -365,7 +365,7 @@ class File(Dev):
         elif self.__mode[0] == 'w':
             self.write_fd = os.open(self.__path, os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0666)
         else:
-            self.write_fd = os.open(self.path, os.O_WRONLY|os.O_CREAT|os.O_APPEND, 0666)
+            self.write_fd = os.open(self.__path, os.O_WRONLY|os.O_CREAT|os.O_APPEND, 0666)
 
     def __del__(self):
         self.close()
@@ -640,17 +640,18 @@ class Pipeline(object):
             cmds = [cmds]  # one-process pipeline
             
         prevPipe = None
-        lastCmd = cmds[len(cmds)-1]
-        for cmd in cmds:
-            prevPipe = self.__add_process(cmd, prevPipe, (cmd==lastCmd), stdin, stdout, stderr)
+        lastCmdIdx = len(cmds)-1
+        for i in xrange(len(cmds)):
+            prevPipe = self.__add_process(cmds[i], prevPipe, (i==lastCmdIdx), stdin, stdout, stderr)
+            
             
     def __add_process(self, cmd, prevPipe, isLastCmd, stdinFirst, stdoutLast, stderr):
         """add one process to the pipeline, return the output pipe if not the last process"""
-        if (prevPipe is None):
+        if prevPipe is None:
             stdin = stdinFirst  # first process in pipeline
         else:
             stdin = prevPipe
-        if (isLastCmd):
+        if isLastCmd:
             outPipe = None
             stdout = stdoutLast # last process in pipeline
         else:

@@ -145,14 +145,35 @@ class PipelineTests(TestCaseBase):
         nopen = self.numOpenFiles()
         inf = self.getInputFile("simple1.txt")
         outf = self.getOutputFile(".out")
+        # double cat actually found a bug
         pl = Pipeline([("cat",),("cat",)], stdin=inf, stdout=File(outf, "w"))
         pl.wait()
         self.diffExpected(".out")
         self.commonChecks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/pipettorTests.PipelineTests.testWriteFile.out$", isRe=True)
 
+    def testReadFile(self):
+        "test read and write to File object"
+        nopen = self.numOpenFiles()
+        inf = self.getInputFile("simple1.txt")
+        outf = self.getOutputFile(".out")
+        pl = Pipeline([("cat",),("cat",)], stdin=File(inf), stdout=File(outf, "w"))
+        pl.wait()
+        self.diffExpected(".out")
+        self.commonChecks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/pipettorTests.PipelineTests.testReadFile.out$", isRe=True)
 
-        
-    # FIXME: add append tests
+    def testAppendFile(self):
+        "test append to File object"
+        nopen = self.numOpenFiles()
+        inf = self.getInputFile("simple1.txt")
+        outf = self.getOutputFile(".out")
+        # double cat actually found a bug
+        pl = Pipeline([("cat",),("cat",)], stdin=inf, stdout=File(outf, "w"))
+        pl.wait()
+        pl = Pipeline([("cat",),("cat",)], stdin=inf, stdout=File(outf, "a"))
+        pl.wait()
+        self.diffExpected(".out")
+        self.commonChecks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/pipettorTests.PipelineTests.testAppendFile.out$", isRe=True)
+
         
 class PopenTests(TestCaseBase):
     def cpFileToPl(self, inName, pl):
