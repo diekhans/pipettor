@@ -3,6 +3,7 @@
 Robust, easy to use Unix process pipelines.
 """
 import os
+import re
 import sys
 import fcntl
 import stat
@@ -17,15 +18,6 @@ import pipes
 from cStringIO import StringIO
 
 
-# FIXME:
-#    - need to close other files (optional)
-#    - not all stdio data types are supported yet (int, file-like)
-#    - need async reader/write that are a pipe that will not deadlock
-#      but also doesn't just buffer in memory
-#    - this shows a bug: (ChrMLifterBroken) ccds2/modules/gencode/src/progs/gencodeMakeTracks/gencodeGtfToGenePred
-#    - passing in a python file or handle is documented but not implemented,
-#    - see ProcOpsTests.py and ProcOpsTests.py BROKEN_
-#    - add dup of stdout and err
 # Why better that subprocess:
 #   - natural pipeline
 #   - stderr thrown as excpetion
@@ -42,6 +34,14 @@ def _signal_num_to_name(num):
         if (getattr(signal, key) == num) and key.startswith("SIG") and (key.find("_") < 0):
             return key
     return "signal"+str(num)
+
+_rwa_re = re.compile("^[rwa]b?$")
+_rw_re = re.compile("^[rw]b?$")
+def _validate_mode(mode, allow_append):
+    mode_re = _rwa_re if allow_append else _rw_re
+    if mode_re.match(mode) is None:
+        expect = "'r', 'w', or 'a'" if allow_append else "'r' or 'w'"
+        raise PipettorException("invalid mode: '%s', expected %s with optional 'b' suffix" % (mode, expect))
 
 class PipettorException(Exception):
     """Base class for exceptions.  This implements exception chaining and
@@ -351,15 +351,15 @@ class File(Dev):
     """A file path for input or output, used for specifying stdio associated
     with files."""
 
-    def __init__(self, path, mode):
-        """constructor, mode is standard r,w, or a"""
+    def __init__(self, path, mode="r"):
+        """constructor, mode is standard r,w, or a with optional, but meaningless, b"""
         Dev.__init__(self)
-        if (len(mode) != 1) or (mode[0] not in "rwa"):
-            raise PipettorException("invalid mode: \"%s\"" % mode)
         self.__path = path
         self.__mode = mode
         # only one of the file descriptors is ever opened
         self.read_fd = self.write_fd = None
+        # must follow setting *_fd fields for __del__
+        _validate_mode(mode, allow_append=True)
         if self.__mode[0] == 'r':
             self.read_fd = os.open(self.__path, os.O_RDONLY)
         elif self.__mode[0] == 'w':
@@ -384,7 +384,6 @@ class File(Dev):
         """post-fork child setup."""
         self.close()
 
-# FIXME: rename to process
 class Process(object):
     """A process, represented as a node a pipeline Proc objects, connected by
     Dev objects. 
@@ -673,10 +672,11 @@ class Pipeline(object):
 
     def __str__(self):
         """get a string describing the pipe"""
-        desc = ""
-        desc += " | ".join([str(proc) for proc in self.procs])
+        desc = str(self.procs[0])
         if self.stdin not in (None, 0):
             desc += " <"+str(self.stdin)
+        if len(self.procs) > 1:
+            desc += " | " + " | ".join([str(proc) for proc in self.procs[1:]])
         if self.stdout not in (None, 1):
             desc += " >"+str(self.stdout)
         if self.stderr not in (None, 2):
@@ -827,10 +827,7 @@ class Popen(Pipeline):
           Popen --> cmd[0] --> ... --> cmd[n] --> other
 
         """
-        # FIXME update doc on , should this support binary/ascii modes
-        # FIXME: should allow append
-        if mode not in ("r", "w"):
-            raise IOError('invalid mode "' + mode + '"')
+        _validate_mode(mode, allow_append=False)
         self.mode = mode
         self.__parent_fh = None
         self.__child_fd = None
