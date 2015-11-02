@@ -4,19 +4,14 @@ Robust, easy to use Unix process pipelines.
 """
 from __future__ import print_function
 import os
-import re
 import sys
-import fcntl
-import stat
 import signal
-import socket
 import errno
-import threading
 import traceback
-import pickle
-import time
 import pipes
-from cStringIO import StringIO
+from pipettor.devices import _validate_mode, Dev, DataReader, DataWriter, _SiblingPipe, File, _StatusPipe
+from pipettor.exceptions import PipettorException, ProcessException
+
 
 # Why better that subprocess:
 #   - natural pipeline
@@ -27,362 +22,10 @@ try:
 except:
     MAXFD = 256
 
-def _signal_num_to_name(num):
-    "get name for a signal number"
-    # find name in signal namespace
-    for key in vars(signal):
-        if (getattr(signal, key) == num) and key.startswith("SIG") and (key.find("_") < 0):
-            return key
-    return "signal"+str(num)
-
-_rwa_re = re.compile("^[rwa]b?$")
-_rw_re = re.compile("^[rw]b?$")
-def _validate_mode(mode, allow_append):
-    mode_re = _rwa_re if allow_append else _rw_re
-    if mode_re.match(mode) is None:
-        expect = "'r', 'w', or 'a'" if allow_append else "'r' or 'w'"
-        raise PipettorException("invalid mode: '%s', expected %s with optional 'b' suffix" % (mode, expect))
-
-class PipettorException(Exception):
-    """Base class for exceptions.  This implements exception chaining and
-    stores a stack trace.
-
-    To chain an exception
-       try:
-          ...
-       except Exception as ex:
-          raise PipettorException("more stuff", ex)
-    """
-    def __init__(self, msg, cause=None):
-        """Constructor."""
-        if (cause is not None) and (not isinstance(cause, PipettorException)):
-            # store stack trace in other Exception types
-            exi = sys.exc_info()
-            if exi is not None:
-                setattr(cause, "stackTrace", traceback.format_list(traceback.extract_tb(exi[2])))
-        Exception.__init__(self, msg)
-        self.msg = msg
-        self.cause = cause
-        self.stackTrace = traceback.format_list(traceback.extract_stack())[0:-1]
-
-    def __str__(self):
-        "recursively construct message for chained exception"
-        desc = self.msg
-        if self.cause is not None:
-            desc += ",\n    caused by: " + self.cause.__class__.__name__ + ": " +  str(self.cause)
-        return desc
-
-    def format(self):
-        "Recursively format chained exceptions into a string with stack trace"
-        return PipettorException.formatExcept(self)
-
-    @staticmethod
-    def formatExcept(ex, doneStacks=None):
-        """Format any type of exception, handling PipettorException objects and
-        stackTrace added to standard Exceptions."""
-        desc = type(ex).__name__ + ": "
-        # don't recurse on PipettorExceptions, as they will include cause in message
-        if isinstance(ex, PipettorException):
-            desc += ex.msg + "\n"
-        else:
-            desc +=  str(ex) +  "\n"
-        st = getattr(ex, "stackTrace", None)
-        if st is not None:
-            if doneStacks is None:
-                doneStacks = set()
-            for s in st:
-                if s not in doneStacks:
-                    desc += s
-                    doneStacks.add(s)
-        ca = getattr(ex, "cause", None)
-        if ca is not None:
-            desc += "caused by: " + PipettorException.formatExcept(ca, doneStacks)
-        return desc
-
-class ProcessException(PipettorException):
-    """Exception associated with running a process.  A None returncode indicates
-    a exec failure."""
-    def __init__(self, procDesc, returncode=None, stderr=None, cause=None):
-        self.returncode = returncode
-        self.stderr = stderr
-        if returncode is None:
-            msg = "exec failed"
-        elif (returncode < 0):
-            msg = "process signaled: " + _signal_num_to_name(-returncode)
-        else:
-            msg = "process exited " + str(returncode)
-        if procDesc is not None:
-            msg += ": " + procDesc
-        if (stderr is not None) and (len(stderr) != 0):
-            msg += ":\n" + stderr
-        PipettorException.__init__(self, msg, cause=cause)
-
-class _StatusPipe(object):
-    """One-way communicate from parent and child during setup.  Close-on-exec is set,
-    so the pipe closing without any data being written indicates a successful exec."""
-    __slots__ = ("read_fh", "write_fh")
-
-    def __init__(self):
-        read_fd, write_fd = os.pipe()
-        self.read_fh = os.fdopen(read_fd, "rb")
-        self.write_fh = os.fdopen(write_fd, "wb")
-        try:
-            self.__set_close_on_exec(self.write_fh)
-        except:
-            self.close()
-            raise
-
-    @staticmethod
-    def __set_close_on_exec( fh):
-        flags = fcntl.fcntl(fh.fileno(), fcntl.F_GETFD)
-        fcntl.fcntl(fh.fileno(), fcntl.F_SETFD, flags|fcntl.FD_CLOEXEC)
-
-    def __del__(self):
-        self.close()
-    
-    def close(self):
-        "close pipes if open"
-        if self.read_fh != None:
-            self.read_fh.close()
-            self.read_fh = None
-        if self.write_fh != None:
-            self.write_fh.close()
-            self.write_fh = None
-        
-    def post_fork_parent(self):
-        "post fork handling in parent"
-        self.write_fh.close()
-        self.write_fh = None
-
-    def post_fork_child(self):
-        "post fork handling in child"
-        self.read_fh.close()
-        self.read_fh = None
-
-    def send(self, obj):
-        """send an object"""
-        pickle.dump(obj, self.write_fh)
-        self.write_fh.flush()
-
-    def receive(self):
-        """receive object from the child or None on EOF"""
-        try:
-            return pickle.load(self.read_fh)
-        except EOFError:
-            return None
-
 class _SetpgidCompleteMsg(object):
     "message sent to by first process to indicate that setpgid is complete"
     pass
     
-class Dev(object):
-    """Base class for objects specifying process input or output.  They
-    provide a way of hide details of setting up interprocess
-    communication.
-
-    Derived class implement the following properties, if applicable:
-       read_fd - file integer descriptor for reading
-       read_fh - file object for reading
-       write_fd - file integer descriptor for writing
-       write_fh - file object for writing"""
-
-    def post_fork_parent(self):
-        """post-fork parent setup."""
-        pass
-
-    def post_fork_child(self):
-        """post-fork child setup."""
-        pass
-
-    def post_exec_parent(self):
-        "called do any post-exec handling in the parent"
-        pass
-        
-    def close(self):
-        """close the device"""
-        pass
-
-class DataReader(Dev):
-    """Object to asynchronously read data from process into memory via a pipe.  A
-    thread is use to prevent deadlock when both reading and writing to a child
-    pipeline.
-    """
-    # FIXME: show DataReader object be passable to multiple process?
-    # FIXME make sure it can handled binary data
-    def __init__(self):
-        Dev.__init__(self)
-        read_fd, self.write_fd = os.pipe()
-        self.read_fh = os.fdopen(read_fd, "rb")
-        self.__buffer = []
-        self.__thread = None
-
-    def __del__(self):
-        "finalizer"
-        self.close()
-
-    def __str__(self):
-        return "[DataReader]"
-
-    def post_fork_parent(self):
-        """post-fork parent setup."""
-        os.close(self.write_fd)
-        self.write_fd = None
-
-    def post_fork_child(self):
-        """post-fork child setup."""
-        self.read_fh.close()
-        
-    def post_exec_parent(self):
-        "called to do any post-exec handling in the parent"
-        self.__thread = threading.Thread(target=self.__reader)
-        self.__thread.start()
-        
-    def close(self):
-        "close pipes and terminate thread"
-        if self.__thread is not None:
-            self.__thread.join()
-            self.__thread = None
-        if self.read_fh is not None:
-            self.read_fh.close()
-            self.read_fh = None
-        if self.write_fd is not None:
-            os.close(self.write_fd)
-            self.write_fd = None
-
-    def __reader(self):
-        "child read thread function"
-        self.__buffer.append(self.read_fh.read())
-
-    @property
-    def data(self):
-        "return buffered data as a string"
-        return "".join(self.__buffer)
-
-class DataWriter(Dev):
-    """Object to asynchronously write data to process from memory via a pipe.  A
-    thread is use to prevent deadlock when both reading and writing to a child
-    pipeline.
-    """
-
-    def __init__(self, data):
-        Dev.__init__(self)
-        self.__data = data
-        self.read_fd, write_fd = os.pipe()
-        self.write_fh = os.fdopen(write_fd, "wb")
-        self.__thread = None
-        
-    def __del__(self):
-        "finalizer"
-        self.close()
-
-    def __str__(self):
-        return "[DataWriter]"
-
-    def post_fork_parent(self):
-        """post-fork parent setup."""
-        os.close(self.read_fd)
-        self.read_fd = None
-
-    def post_fork_child(self):
-        """post-fork child setup."""
-        self.write_fh.close()
-        self.write_fh = None
-        
-    def post_exec_parent(self):
-        "called to do any post-exec handling in the parent"
-        self.__thread = threading.Thread(target=self.__writer)
-        self.__thread.start()
-        
-    def close(self):
-        "close pipes and terminate thread"
-        if self.__thread is not None:
-            self.__thread.join()
-            self.__thread = None
-        if self.read_fd is not None:
-            os.close(self.read_fd)
-            self.read_fd = None
-        if self.write_fh is not None:
-            self.write_fh.close()
-            self.write_fh = None
-
-    def __writer(self):
-        "write thread function"
-        try:
-            self.write_fh.write(self.__data)
-            self.write_fh.close()
-            self.write_fh = None
-        except IOError as ex:
-            # don't raise error on broken pipe
-            if ex.errno != errno.EPIPE:
-                raise
-
-class SiblingPipe(Dev):
-    """Interprocess communication between two child process by anonymous
-    pipes."""
-
-    def __init__(self):
-        Dev.__init__(self)
-        self.read_fd, self.write_fd = os.pipe()
-
-    def __del__(self):
-        "finalizer"
-        self.close()
-
-    def __str__(self):
-        return "[Pipe]"
-
-    def post_exec_parent(self):
-        "called to do any post-exec handling in the parent"
-        os.close(self.read_fd)
-        self.read_fd = None
-        os.close(self.write_fd)
-        self.write_fd = None
-        
-    def close(self):
-        if self.read_fd is not None:
-            os.close(self.read_fd)
-            self.read_fd = None
-        if self.write_fd is not None:
-            os.close(self.write_fd)
-            self.write_fd = None
-
-class File(Dev):
-    """A file path for input or output, used for specifying stdio associated
-    with files."""
-
-    def __init__(self, path, mode="r"):
-        """constructor, mode is standard r,w, or a with optional, but meaningless, b"""
-        Dev.__init__(self)
-        self.__path = path
-        self.__mode = mode
-        # only one of the file descriptors is ever opened
-        self.read_fd = self.write_fd = None
-        # must follow setting *_fd fields for __del__
-        _validate_mode(mode, allow_append=True)
-        if self.__mode[0] == 'r':
-            self.read_fd = os.open(self.__path, os.O_RDONLY)
-        elif self.__mode[0] == 'w':
-            self.write_fd = os.open(self.__path, os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0o666)
-        else:
-            self.write_fd = os.open(self.__path, os.O_WRONLY|os.O_CREAT|os.O_APPEND, 0o666)
-
-    def __del__(self):
-        self.close()
-    def __str__(self):
-        return self.__path
-
-    def close(self):
-        if self.read_fd is not None:
-            os.close(self.read_fd)
-            self.read_fd = None
-        if self.write_fd is not None:
-            os.close(self.write_fd)
-            self.write_fd = None
-
-    def post_fork_parent(self):
-        """post-fork child setup."""
-        self.close()
-
 class Process(object):
     """A process, represented as a node a pipeline Proc objects, connected by
     Dev objects. 
@@ -498,8 +141,8 @@ class Process(object):
         signal.signal(signal.SIGPIPE, signal.SIG_DFL)  # ensure terminate on pipe close
         os.execvp(self.cmd[0], self.cmd)
             
-    def __child_start(self):
-        "start in child process"
+    def __child_do_exec(self):
+        " in child process"
         try:
             self.__child_exec()
         except Exception as ex:
@@ -508,6 +151,17 @@ class Process(object):
             if not isinstance(ex, ProcessException):
                 ex = ProcessException(str(self), cause=ex)
             self.status_pipe.send(ex)
+            os._exit(255)
+
+    def __child_start(self):
+        "start in child process"
+        try:
+            self.__child_do_exec()
+        except Exception as ex:
+            # FIXME: make something
+            sys.stderr.write("child process exec error handling logic error: " +str(ex)+"\n")
+        finally:
+            os.abort() # should never make it here
 
     def __parent_setup_process_group_leader(self):
         status = self.status_pipe.receive()
@@ -534,10 +188,7 @@ class Process(object):
         self.started = True  # do first to prevent restarts on error
         self.pid = os.fork()
         if self.pid == 0:
-            try:
-                self.__child_start()
-            finally:
-                os.abort() # should never make it here
+            self.__child_start()
         else:
             self.__parent_start()
 
@@ -661,7 +312,7 @@ class Pipeline(object):
             outPipe = None
             stdout = stdoutLast # last process in pipeline
         else:
-            outPipe = SiblingPipe()
+            outPipe = _SiblingPipe()
             stdout = outPipe
         try:
             self.__create_process(cmd, stdin, stdout, stderr)
