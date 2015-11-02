@@ -767,16 +767,19 @@ class Pipeline(object):
         for p in self.procs:
             p.raise_if_failed()
 
+    def __poll(self):
+        for p in self.procs:
+            if not p.poll():
+                return False
+        self.__finish()
+        
     def poll(self):
         """Check if all of the processes have completed.  Return True if it
         has, False if it hasn't."""
         if not self.started:
             self.start()
         try:
-            for p in self.procs:
-                if not p.poll():
-                    return False
-            self.__finish()
+            self.__poll()
         except:
             self.__error_cleanup()
             raise
@@ -794,6 +797,11 @@ class Pipeline(object):
         p._handle_exit(w[1])
         return True
 
+    def __wait(self):
+        while self.__wait_on_one():
+            pass
+        self.__finish()
+    
     def wait(self):
         """Wait for all of the process to complete. Generate an exception if
         any exits non-zero or signals. Starts process if not already
@@ -801,9 +809,7 @@ class Pipeline(object):
         if not self.started:
             self.start()
         try:
-            while self.__wait_on_one():
-                pass
-            self.__finish()
+            self.__wait()
         except:
             self.__error_cleanup()
             raise

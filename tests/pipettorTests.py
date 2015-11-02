@@ -35,12 +35,20 @@ class PipelineTests(TestCaseBase):
         pl.wait()
         self.commonChecks(nopen, pl, "true")
 
-    def testTrivialFail(self):
+    def testTrivialPoll(self):
         nopen = self.numOpenFiles()
-        pl = Pipeline(("false",))
-        with self.assertRaisesRegexp(ProcessException, "^process exited 1: false$") as cm:
+        pl = Pipeline(("sleep", "1"))
+        while not pl.poll():
+            pass
+        pl.wait()
+        self.commonChecks(nopen, pl, "sleep 1")
+
+    def testTrivialFailPoll(self):
+        nopen = self.numOpenFiles()
+        pl = Pipeline([("sleep", "1"), ("false",)])
+        with self.assertRaisesRegexp(ProcessException, "^process exited 1: sleep 1 | false$") as cm:
             pl.wait()
-        self.commonChecks(nopen, pl, "false")
+        self.commonChecks(nopen, pl, "sleep 1 | false")
 
     def testSimplePipe(self):
         nopen = self.numOpenFiles()
