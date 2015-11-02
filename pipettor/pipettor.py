@@ -363,9 +363,9 @@ class File(Dev):
         if self.__mode[0] == 'r':
             self.read_fd = os.open(self.__path, os.O_RDONLY)
         elif self.__mode[0] == 'w':
-            self.write_fd = os.open(self.__path, os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0666)
+            self.write_fd = os.open(self.__path, os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0o666)
         else:
-            self.write_fd = os.open(self.__path, os.O_WRONLY|os.O_CREAT|os.O_APPEND, 0666)
+            self.write_fd = os.open(self.__path, os.O_WRONLY|os.O_CREAT|os.O_APPEND, 0o666)
 
     def __del__(self):
         self.close()

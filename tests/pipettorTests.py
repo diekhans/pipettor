@@ -1,9 +1,9 @@
 # Copyright 2006-2012 Mark Diekhans
 import unittest, sys, os, re
 if __name__ == '__main__':
-    sys.path.insert(0, os.path.normpath(os.path.dirname(sys.argv[0]))+"/../..")
+    sys.path.insert(0, os.path.normpath(os.path.dirname(sys.argv[0]))+"/..")
 from pipettor.pipettor import Pipeline, Popen, ProcException, PipettorException, DataReader, DataWriter, File
-from tests.pipettor.testCaseBase import TestCaseBase
+from testCaseBase import TestCaseBase
 
 # this keeps OS/X crash reporter from popping up on unittest error
 import signal
