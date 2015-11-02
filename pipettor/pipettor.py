@@ -527,7 +527,7 @@ class Process(object):
             # first process is process leader.
             self.__parent_setup_process_group_leader()
 
-    def __start(self, pgid):
+    def __start_processes(self, pgid):
         "Do work of starting the process, if pgid is None do group leader setup"
         self.pgid = pgid
         self.status_pipe = _StatusPipe()
@@ -544,7 +544,7 @@ class Process(object):
     def _start(self, pgid):
         "start the process,, if pgid is do group leader setup"
         try:
-            self.__start(pgid)
+            self.__start_processes(pgid)
         except:
             self.exceptinfo = sys.exc_info()
         if self.exceptinfo is not None:
@@ -589,7 +589,7 @@ class Process(object):
             self.__handle_error_exit()
         self.status_pipe.close()
 
-    def _poll(self):
+    def poll(self):
         """Check if the process has completed.  Return True if it
         has, False if it hasn't."""
         if self.finished:
@@ -605,7 +605,7 @@ class Process(object):
         """
         if self.started and not self.finished:
             # check if finished before killing
-            if not self._poll():
+            if not self.poll():
                 self.forced = True
                 os.kill(self.pid, signal.SIGKILL)
                 w = os.waitpid(self.pid, 0)
@@ -698,6 +698,7 @@ class Pipeline(object):
     def __start(self):
         for proc in self.procs:
             self.__start_process(proc)
+
     def __exec_barrier(self):
         for p in self.procs:
             p._execwait()
@@ -763,7 +764,7 @@ class Pipeline(object):
             self.start()
         try:
             for p in self.procs:
-                if not p._poll():
+                if not p.poll():
                     return False
             self.__finish()
         except:

@@ -35,6 +35,8 @@ def ensureFileDir(fname):
         return dir
     else:
         return "."
+def _sentinel(*args, **kwargs):
+    raise AssertionError('Should never be called')
 
 class TestCaseBase(unittest.TestCase):
     """Base class for test case with various test support functions"""
@@ -198,4 +200,3 @@ class TestCaseBase(unittest.TestCase):
         """Fail if the str(obj) does not match expectRe operator, including `.' matching newlines"""
         if not re.match(expectRe, str(obj), re.DOTALL):
             raise self.failureException, (msg or "'%s' does not match '%s'" % (str(obj), expectRe))
-

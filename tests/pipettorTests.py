@@ -56,7 +56,7 @@ class PipelineTests(TestCaseBase):
         self.commonChecks(nopen, pl, "false | true")
 
     def testExecFail(self):
-        "invalid executable"
+        # invalid executable
         nopen = self.numOpenFiles()
         dw = DataWriter("one\ntwo\nthree\n")
         pl = Pipeline(("procDoesNotExist","-r"), stdin=dw)
@@ -70,7 +70,7 @@ class PipelineTests(TestCaseBase):
         self.commonChecks(nopen, pl, "procDoesNotExist -r <[DataWriter]")
 
     def testStdinMem(self):
-        "write from memory to stdin"
+        # write from memory to stdin
         nopen = self.numOpenFiles()
         outf = self.getOutputFile(".out")
         dw = DataWriter("one\ntwo\nthree\n")
@@ -80,7 +80,7 @@ class PipelineTests(TestCaseBase):
         self.commonChecks(nopen, pl, "^sort -r <\\[DataWriter\\] >.+/output/pipettorTests\\.PipelineTests\\.testStdinMem\\.out$", isRe=True)
 
     def testStdoutMem(self):
-        "read from stdout into memory"
+        # read from stdout into memory
         nopen = self.numOpenFiles()
         inf = self.getInputFile("simple1.txt")
         dr = DataReader()
@@ -90,7 +90,7 @@ class PipelineTests(TestCaseBase):
         self.commonChecks(nopen, pl, "^sort -r <.+/input/simple1\\.txt >\\[DataReader\\]", isRe=True)
 
     def testStdinStdoutMem(self):
-        "write and read from memory"
+        # write and read from memory
         nopen = self.numOpenFiles()
         dw = DataWriter("one\ntwo\nthree\n")
         dr = DataReader()
@@ -116,7 +116,7 @@ class PipelineTests(TestCaseBase):
         self.commonChecks(nopen, pl, "bash -c 'echo this goes to stdout; echo this goes to stderr >&2' >[DataReader] 2>[DataReader]")
                        
     def testStdinMemBinary(self):
-        "binary write from memory to stdin"
+        # binary write from memory to stdin
         nopen = self.numOpenFiles()
         outf = self.getOutputFile(".out")
         fh = open(self.getInputFile("file.binary"), "rb")
@@ -128,7 +128,7 @@ class PipelineTests(TestCaseBase):
         self.commonChecks(nopen, pl, "^cat <\\[DataWriter] >.*/output/pipettorTests.PipelineTests.testStdinMemBinary.out$", isRe=True)
 
     def testStdoutMemBinary(self):
-        "binary read from stdout into memory"
+        # binary read from stdout into memory
         nopen = self.numOpenFiles()
         inf = self.getInputFile("file.binary")
         dr = DataReader()
@@ -141,7 +141,7 @@ class PipelineTests(TestCaseBase):
         self.commonChecks(nopen, pl, "^cat <.*/input/file.binary >\\[DataReader]$", isRe=True)
 
     def testWriteFile(self):
-        "test write to File object"
+        # test write to File object
         nopen = self.numOpenFiles()
         inf = self.getInputFile("simple1.txt")
         outf = self.getOutputFile(".out")
@@ -152,7 +152,7 @@ class PipelineTests(TestCaseBase):
         self.commonChecks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/pipettorTests.PipelineTests.testWriteFile.out$", isRe=True)
 
     def testReadFile(self):
-        "test read and write to File object"
+        # test read and write to File object
         nopen = self.numOpenFiles()
         inf = self.getInputFile("simple1.txt")
         outf = self.getOutputFile(".out")
@@ -162,7 +162,7 @@ class PipelineTests(TestCaseBase):
         self.commonChecks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/pipettorTests.PipelineTests.testReadFile.out$", isRe=True)
 
     def testAppendFile(self):
-        "test append to File object"
+        # test append to File object
         nopen = self.numOpenFiles()
         inf = self.getInputFile("simple1.txt")
         outf = self.getOutputFile(".out")
@@ -259,7 +259,7 @@ class PopenTests(TestCaseBase):
             self.assertTrue(p.returncode == 1)
 
     def testSigPipe(self):
-        "test not reading all of pipe output"
+        # test not reading all of pipe output
         pl = Popen([("yes",), ("true",)], "r")
         pl.wait()
         
