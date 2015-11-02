@@ -2,7 +2,7 @@
 import unittest, sys, os, re
 if __name__ == '__main__':
     sys.path.insert(0, os.path.normpath(os.path.dirname(sys.argv[0]))+"/..")
-from pipettor.pipettor import Pipeline, Popen, ProcException, PipettorException, DataReader, DataWriter, File
+from pipettor.pipettor import Pipeline, Popen, ProcessException, PipettorException, DataReader, DataWriter, File
 from testCaseBase import TestCaseBase
 
 # this keeps OS/X crash reporter from popping up on unittest error
@@ -38,7 +38,7 @@ class PipelineTests(TestCaseBase):
     def testTrivialFail(self):
         nopen = self.numOpenFiles()
         pl = Pipeline(("false",))
-        with self.assertRaisesRegexp(ProcException, "^process exited 1: false$") as cm:
+        with self.assertRaisesRegexp(ProcessException, "^process exited 1: false$") as cm:
             pl.wait()
         self.commonChecks(nopen, pl, "false")
 
@@ -51,7 +51,7 @@ class PipelineTests(TestCaseBase):
     def testSimplePipeFail(self):
         nopen = self.numOpenFiles()
         pl = Pipeline([("false",), ("true",)])
-        with self.assertRaisesRegexp(ProcException, "^process exited 1: false$") as cm:
+        with self.assertRaisesRegexp(ProcessException, "^process exited 1: false$") as cm:
             pl.wait()
         self.commonChecks(nopen, pl, "false | true")
 
@@ -60,7 +60,7 @@ class PipelineTests(TestCaseBase):
         nopen = self.numOpenFiles()
         dw = DataWriter("one\ntwo\nthree\n")
         pl = Pipeline(("procDoesNotExist","-r"), stdin=dw)
-        with self.assertRaises(ProcException) as cm:
+        with self.assertRaises(ProcessException) as cm:
             pl.wait()
         expect = "exec failed: procDoesNotExist -r,\n    caused by: OSError: [Errno 2] No such file or directory"
         msg = str(cm.exception)
@@ -68,6 +68,19 @@ class PipelineTests(TestCaseBase):
             self.fail("'"+ msg + "' does not start with '"
                       + expect + "', cause: " + str(getattr(cm.exception,"cause", None)))
         self.commonChecks(nopen, pl, "procDoesNotExist -r <[DataWriter]")
+
+    def testSignaled(self):
+        # process signals
+        nopen = self.numOpenFiles()
+        pl = Pipeline(("sh","-c", "kill -11 $$"))
+        with self.assertRaises(ProcessException) as cm:
+            pl.wait()
+        expect = "process signaled: SIGSEGV: sh -c 'kill -11 $$'"
+        msg = str(cm.exception)
+        if not msg.startswith(expect):
+            self.fail("'"+ msg + "' does not start with '"
+                      + expect + "', cause: " + str(getattr(cm.exception,"cause", None)))
+        self.commonChecks(nopen, pl,  "sh -c 'kill -11 $$'")
 
     def testStdinMem(self):
         # write from memory to stdin
@@ -174,6 +187,31 @@ class PipelineTests(TestCaseBase):
         self.diffExpected(".out")
         self.commonChecks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/pipettorTests.PipelineTests.testAppendFile.out$", isRe=True)
 
+    def testBogusStdin(self):
+        # test stdin specification is not legal
+        nopen = self.numOpenFiles()
+        with self.assertRaisesRegexp(PipettorException, "^invalid stdio specification object type: <type 'float'>$") as cm:
+            pl = Pipeline([("date",),("date",)], stdin=3.14159)
+            pl.wait()
+        self.commonChecks(nopen, None, None)
+
+    def testBogusStdout(self):
+        # test stdout specification is not legal
+        nopen = self.numOpenFiles()
+        with self.assertRaisesRegexp(PipettorException, "^invalid stdio specification object type: <type 'float'>$") as cm:
+            pl = Pipeline([("date",),("date",)], stdout=3.14159)
+            pl.wait()
+        self.commonChecks(nopen, None, None)
+
+    def testBogusStderr(self):
+        # test stderr specification is not legal
+        nopen = self.numOpenFiles()
+        with self.assertRaisesRegexp(PipettorException, "^invalid stdio specification object type: <type 'float'>$") as cm:
+            pl = Pipeline([("date",),("date",)], stderr=3.14159)
+            pl.wait()
+        self.commonChecks(nopen, None, None)
+
+
         
 class PopenTests(TestCaseBase):
     def cpFileToPl(self, inName, pl):
@@ -253,7 +291,7 @@ class PopenTests(TestCaseBase):
 
     def testExitCode(self):
         pl = Popen(("false",))
-        with self.assertRaisesRegexp(ProcException, "^process exited 1: false$") as cm:
+        with self.assertRaisesRegexp(ProcessException, "^process exited 1: false$") as cm:
             pl.wait()
         for p in pl.procs:
             self.assertTrue(p.returncode == 1)

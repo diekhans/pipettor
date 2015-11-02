@@ -99,8 +99,7 @@ class PipettorException(Exception):
             desc += "caused by: " + PipettorException.formatExcept(ca, doneStacks)
         return desc
 
-# FIXME better name
-class ProcException(PipettorException):
+class ProcessException(PipettorException):
     """Exception associated with running a process.  A None returncode indicates
     a exec failure."""
     def __init__(self, procDesc, returncode=None, stderr=None, cause=None):
@@ -399,7 +398,7 @@ class Process(object):
        - a Dev derived object
 
     If stderr is an instance of DataReader, then stderr is included in
-    ProcException on process error.  If the class DataReader is passed
+    ProcessException on process error.  If the class DataReader is passed
     in as stderr, a DataReader object is created.
     """
 
@@ -453,6 +452,7 @@ class Process(object):
             else:
                 fd = spec.write_fd
         if fd is None:
+            # this should have been detected before forking
             raise PipettorException("__stdio_child_setup logic error: %s %s" % (str(type(spec)), stdfd))
         # dup to target descriptor if not already there
         if fd != stdfd:
@@ -503,10 +503,10 @@ class Process(object):
         try:
             self.__child_exec()
         except Exception as ex:
-            # FIXME: use isinstance(ex, ProcException) causes error in python
+            # FIXME: use isinstance(ex, ProcessException) causes error in python
             # FIXME: lets see if it is fixed
-            if not isinstance(ex, ProcException):
-                ex = ProcException(str(self), cause=ex)
+            if not isinstance(ex, ProcessException):
+                ex = ProcessException(str(self), cause=ex)
             self.status_pipe.send(ex)
 
     def __parent_setup_process_group_leader(self):
@@ -557,8 +557,8 @@ class Process(object):
         if ex != None:
             if not isinstance(ex, Exception):
                 ex = PipettorException("unexpected object return from child exec status pipe: %s: %s" % (str(type(ex)), str(ex)))
-            if not isinstance(ex, ProcException):
-                ex = ProcException(str(self), cause=ex)
+            if not isinstance(ex, ProcessException):
+                ex = ProcessException(str(self), cause=ex)
             raise ex
         self.status_pipe.close()
 
@@ -578,7 +578,7 @@ class Process(object):
             stderr = self.stderr.data
         # don't save exception if we force it to be ill
         if not self.forced:
-            self.exceptinfo = (ProcException(str(self), self.returncode, stderr), None, None)
+            self.exceptinfo = (ProcessException(str(self), self.returncode, stderr), None, None)
         
     def _handle_exit(self, waitStat):
         """Handle process exiting, saving status  """
@@ -628,7 +628,6 @@ class Pipeline(object):
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
-
         self.procs = []
         self.devs = set()
         self.pgid = None      # process group leader
@@ -638,11 +637,17 @@ class Pipeline(object):
 
         if isinstance(cmds[0], str):
             cmds = [cmds]  # one-process pipeline
-            
+        try:
+            self.__setup_processes(cmds)
+        except:
+            self.__error_cleanup()
+            raise
+
+    def __setup_processes(self, cmds):
         prevPipe = None
         lastCmdIdx = len(cmds)-1
         for i in xrange(len(cmds)):
-            prevPipe = self.__add_process(cmds[i], prevPipe, (i==lastCmdIdx), stdin, stdout, stderr)
+            prevPipe = self.__add_process(cmds[i], prevPipe, (i==lastCmdIdx), self.stdin, self.stdout, self.stderr)
             
             
     def __add_process(self, cmd, prevPipe, isLastCmd, stdinFirst, stdoutLast, stderr):
@@ -657,7 +662,12 @@ class Pipeline(object):
         else:
             outPipe = SiblingPipe()
             stdout = outPipe
-        self.__create_process(cmd, stdin, stdout, stderr)
+        try:
+            self.__create_process(cmd, stdin, stdout, stderr)
+        except:
+            if outPipe != None:
+                outPipe.close()
+            raise
         return outPipe
 
     def __create_process(self, cmd, stdin, stdout, stderr):
@@ -921,6 +931,6 @@ class Popen(Pipeline):
             
 
 # FIXME:
-# __all__ = [ProcException.__name__, PIn.__name__, POut.__name__, Dev.__name__,
+# __all__ = [ProcessException.__name__, PIn.__name__, POut.__name__, Dev.__name__,
 #            DataReader.__name__, DataWriter.__name__, Pipe.__name__, File.__name__,
 #            Proc.__name__, ProcDag.__name__, Procline.__name__, Pipeline.__name__]
