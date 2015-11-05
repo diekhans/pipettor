@@ -28,7 +28,7 @@ setup(
     description="pipettor - robust, easy to use Unix process pipelines",
     long_description=readme + '\n\n' + history,
     author="Mark Diekhans",
-    author_email='markd@kermodei.com',
+    author_email='markd@ucsc.edu',
     url='https://github.com/diekhans/pipettor',
     packages=[
         'pipettor',

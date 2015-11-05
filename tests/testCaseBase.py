@@ -1,11 +1,18 @@
 # Copyright 2006-2012 Mark Diekhans
-import os, sys, unittest, difflib, threading, errno, re, glob, subprocess
-from pipes import quote
+import os
+import sys
+import unittest
+import difflib
+import threading
+import errno
+import re
+import glob
 
 try:
     MAXFD = os.sysconf("SC_OPEN_MAX")
 except:
     MAXFD = 256
+
 
 def rmTree(root):
     "remove a file hierarchy, root can be a file or a directory"
@@ -18,13 +25,15 @@ def rmTree(root):
         if os.path.lexists(root):
             os.unlink(root)
 
+
 def ensureDir(dir):
     """Ensure that a directory exists, creating it (and parents) if needed."""
-    try: 
+    try:
         os.makedirs(dir)
     except OSError as ex:
         if ex.errno != errno.EEXIST:
-            raise e
+            raise ex
+
 
 def ensureFileDir(fname):
     """Ensure that the directory for a file exists, creating it (and parents) if needed.
@@ -35,8 +44,7 @@ def ensureFileDir(fname):
         return dir
     else:
         return "."
-def _sentinel(*args, **kwargs):
-    raise AssertionError('Should never be called')
+
 
 class TestCaseBase(unittest.TestCase):
     """Base class for test case with various test support functions"""
@@ -48,10 +56,10 @@ class TestCaseBase(unittest.TestCase):
         od = self.getOutputDir()
         for f in glob.glob(od+"/"+clId + ".*") + glob.glob(od+"/tmp.*."+clId + ".*"):
             rmTree(f)
-    
+
     def getClassId(self):
-        """Get the first part of the portable test id, consisting 
-        moduleBase.class.  This is the prefix to output files"""  
+        """Get the first part of the portable test id, consisting
+        moduleBase.class.  This is the prefix to output files"""
         # module name is __main__ when run standalone, so get base file name
         mod = os.path.splitext(os.path.basename(sys.modules[self.__class__.__module__].__file__))[0]
         return mod + "." + self.__class__.__name__
@@ -65,7 +73,7 @@ class TestCaseBase(unittest.TestCase):
 
     def getTestDir(self):
         """find test directory, where concrete class is defined."""
-        testDir =  os.path.dirname(sys.modules[self.__class__.__module__].__file__)
+        testDir = os.path.dirname(sys.modules[self.__class__.__module__].__file__)
         if testDir == "":
             testDir = "."
         testDir = os.path.realpath(testDir)
@@ -87,14 +95,14 @@ class TestCaseBase(unittest.TestCase):
 
     def getOutputDir(self):
         """get the path to the output directory to use for this test, create if it doesn't exist"""
-        d = self.getTestDir() + "/output";
+        d = self.getTestDir() + "/output"
         ensureDir(d)
         return d
 
     def getOutputFile(self, ext):
         """Get path to the output file, using the current test id and append
         ext, which should contain a dot"""
-        f = self.getOutputDir() + "/" + self.getId() + ext;
+        f = self.getOutputDir() + "/" + self.getId() + ext
         ensureFileDir(f)
         return f
 
@@ -102,7 +110,7 @@ class TestCaseBase(unittest.TestCase):
         """Get path to the expected file, using the current test id and append
         ext. If basename is used, it is inset of the test id, allowing share
         an expected file between multiple tests."""
-        return self.getTestDir() + "/expected/" + (basename if basename is not None else self.getId()) + ext;
+        return self.getTestDir() + "/expected/" + (basename if basename is not None else self.getId()) + ext
 
     def __getLines(self, file):
         fh = open(file)

@@ -1,5 +1,8 @@
 # Copyright 2006-2012 Mark Diekhans
-import unittest, sys, os, re
+import unittest
+import sys
+import os
+import re
 if __name__ == '__main__':
     sys.path.insert(0, os.path.normpath(os.path.dirname(sys.argv[0]))+"/..")
 from pipettor import Pipeline, Popen, ProcessException, PipettorException, DataReader, DataWriter, File
@@ -22,7 +25,7 @@ class PipelineTests(TestCaseBase):
         if expectStr is not None:
             if isRe:
                 if not re.search(expectStr, s):
-                    self.fail("'" +s+ "' doesn't match RE '" + expectStr + "'")
+                    self.fail("'" + s + "' doesn't match RE '" + expectStr + "'")
             else:
                 self.assertEqual(s, expectStr)
         self.assertNoChildProcs()
@@ -46,7 +49,7 @@ class PipelineTests(TestCaseBase):
     def testTrivialFailPoll(self):
         nopen = self.numOpenFiles()
         pl = Pipeline([("sleep", "1"), ("false",)])
-        with self.assertRaisesRegexp(ProcessException, "^process exited 1: sleep 1 | false$") as cm:
+        with self.assertRaisesRegexp(ProcessException, "^process exited 1: sleep 1 | false$"):
             pl.wait()
         self.commonChecks(nopen, pl, "sleep 1 | false")
 
@@ -70,7 +73,7 @@ class PipelineTests(TestCaseBase):
     def testSimplePipeFail(self):
         nopen = self.numOpenFiles()
         pl = Pipeline([("false",), ("true",)])
-        with self.assertRaisesRegexp(ProcessException, "^process exited 1: false$") as cm:
+        with self.assertRaisesRegexp(ProcessException, "^process exited 1: false$"):
             pl.wait()
         self.commonChecks(nopen, pl, "false | true")
 
@@ -78,27 +81,27 @@ class PipelineTests(TestCaseBase):
         # invalid executable
         nopen = self.numOpenFiles()
         dw = DataWriter("one\ntwo\nthree\n")
-        pl = Pipeline(("procDoesNotExist","-r"), stdin=dw)
+        pl = Pipeline(("procDoesNotExist", "-r"), stdin=dw)
         with self.assertRaises(ProcessException) as cm:
             pl.wait()
         expect = "exec failed: procDoesNotExist -r,\n    caused by: OSError: [Errno 2] No such file or directory"
         msg = str(cm.exception)
         if not msg.startswith(expect):
-            self.fail("'"+ msg + "' does not start with '"
-                      + expect + "', cause: " + str(getattr(cm.exception,"cause", None)))
+            self.fail("'" + msg + "' does not start with '"
+                      + expect + "', cause: " + str(getattr(cm.exception, "cause", None)))
         self.commonChecks(nopen, pl, "procDoesNotExist -r <[DataWriter]")
 
     def testSignaled(self):
         # process signals
         nopen = self.numOpenFiles()
-        pl = Pipeline(("sh","-c", "kill -11 $$"))
+        pl = Pipeline(("sh", "-c", "kill -11 $$"))
         with self.assertRaises(ProcessException) as cm:
             pl.wait()
         expect = "process signaled: SIGSEGV: sh -c 'kill -11 $$'"
         msg = str(cm.exception)
         if not msg.startswith(expect):
-            self.fail("'"+ msg + "' does not start with '"
-                      + expect + "', cause: " + str(getattr(cm.exception,"cause", None)))
+            self.fail("'" + msg + "' does not start with '"
+                      + expect + "', cause: " + str(getattr(cm.exception, "cause", None)))
         self.commonChecks(nopen, pl,  "sh -c 'kill -11 $$'")
 
     def testStdinMem(self):
@@ -106,7 +109,7 @@ class PipelineTests(TestCaseBase):
         nopen = self.numOpenFiles()
         outf = self.getOutputFile(".out")
         dw = DataWriter("one\ntwo\nthree\n")
-        pl = Pipeline(("sort","-r"), stdin=dw, stdout=outf)
+        pl = Pipeline(("sort", "-r"), stdin=dw, stdout=outf)
         pl.wait()
         self.diffExpected(".out")
         self.commonChecks(nopen, pl, "^sort -r <\\[DataWriter\\] >.+/output/pipettorTests\\.PipelineTests\\.testStdinMem\\.out$", isRe=True)
@@ -116,7 +119,7 @@ class PipelineTests(TestCaseBase):
         nopen = self.numOpenFiles()
         inf = self.getInputFile("simple1.txt")
         dr = DataReader()
-        pl = Pipeline(("sort","-r"), stdin=inf, stdout=dr)
+        pl = Pipeline(("sort", "-r"), stdin=inf, stdout=dr)
         pl.wait()
         self.assertEqual(dr.data, "two\nthree\nsix\none\nfour\nfive\n")
         self.commonChecks(nopen, pl, "^sort -r <.+/input/simple1\\.txt >\\[DataReader\\]", isRe=True)
@@ -126,13 +129,13 @@ class PipelineTests(TestCaseBase):
         nopen = self.numOpenFiles()
         dw = DataWriter("one\ntwo\nthree\n")
         dr = DataReader()
-        pl = Pipeline([("cat","-u"),("cat","-u")], stdin=dw, stdout=dr)
+        pl = Pipeline([("cat", "-u"), ("cat", "-u")], stdin=dw, stdout=dr)
         pl.wait()
         self.assertEqual(dr.data, "one\ntwo\nthree\n")
         self.commonChecks(nopen, pl, "^cat -u <\\[DataWriter\\] \\| cat -u >\\[DataReader\\]$", isRe=True)
 
     def testFileMode(self):
-        with self.assertRaisesRegexp(PipettorException, "^invalid mode: 'q', expected 'r', 'w', or 'a' with optional 'b' suffix$") as cm:
+        with self.assertRaisesRegexp(PipettorException, "^invalid mode: 'q', expected 'r', 'w', or 'a' with optional 'b' suffix$"):
             File("/dev/null", "q")
 
     def testCollectStdoutErr(self):
@@ -146,7 +149,7 @@ class PipelineTests(TestCaseBase):
         self.assertEqual(stdoutRd.data, "this goes to stdout\n")
         self.assertEqual(stderrRd.data, "this goes to stderr\n")
         self.commonChecks(nopen, pl, "bash -c 'echo this goes to stdout; echo this goes to stderr >&2' >[DataReader] 2>[DataReader]")
-                       
+
     def testStdinMemBinary(self):
         # binary write from memory to stdin
         nopen = self.numOpenFiles()
@@ -178,7 +181,7 @@ class PipelineTests(TestCaseBase):
         inf = self.getInputFile("simple1.txt")
         outf = self.getOutputFile(".out")
         # double cat actually found a bug
-        pl = Pipeline([("cat",),("cat",)], stdin=inf, stdout=File(outf, "w"))
+        pl = Pipeline([("cat",), ("cat",)], stdin=inf, stdout=File(outf, "w"))
         pl.wait()
         self.diffExpected(".out")
         self.commonChecks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/pipettorTests.PipelineTests.testWriteFile.out$", isRe=True)
@@ -188,7 +191,7 @@ class PipelineTests(TestCaseBase):
         nopen = self.numOpenFiles()
         inf = self.getInputFile("simple1.txt")
         outf = self.getOutputFile(".out")
-        pl = Pipeline([("cat",),("cat",)], stdin=File(inf), stdout=File(outf, "w"))
+        pl = Pipeline([("cat",), ("cat",)], stdin=File(inf), stdout=File(outf, "w"))
         pl.wait()
         self.diffExpected(".out")
         self.commonChecks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/pipettorTests.PipelineTests.testReadFile.out$", isRe=True)
@@ -199,9 +202,9 @@ class PipelineTests(TestCaseBase):
         inf = self.getInputFile("simple1.txt")
         outf = self.getOutputFile(".out")
         # double cat actually found a bug
-        pl = Pipeline([("cat",),("cat",)], stdin=inf, stdout=File(outf, "w"))
+        pl = Pipeline([("cat",), ("cat",)], stdin=inf, stdout=File(outf, "w"))
         pl.wait()
-        pl = Pipeline([("cat",),("cat",)], stdin=inf, stdout=File(outf, "a"))
+        pl = Pipeline([("cat",), ("cat",)], stdin=inf, stdout=File(outf, "a"))
         pl.wait()
         self.diffExpected(".out")
         self.commonChecks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/pipettorTests.PipelineTests.testAppendFile.out$", isRe=True)
@@ -209,29 +212,28 @@ class PipelineTests(TestCaseBase):
     def testBogusStdin(self):
         # test stdin specification is not legal
         nopen = self.numOpenFiles()
-        with self.assertRaisesRegexp(PipettorException, "^invalid stdio specification object type: <type 'float'>$") as cm:
-            pl = Pipeline([("date",),("date",)], stdin=3.14159)
+        with self.assertRaisesRegexp(PipettorException, "^invalid stdio specification object type: <type 'float'>$"):
+            pl = Pipeline([("date",), ("date",)], stdin=3.14159)
             pl.wait()
         self.commonChecks(nopen, None, None)
 
     def testBogusStdout(self):
         # test stdout specification is not legal
         nopen = self.numOpenFiles()
-        with self.assertRaisesRegexp(PipettorException, "^invalid stdio specification object type: <type 'float'>$") as cm:
-            pl = Pipeline([("date",),("date",)], stdout=3.14159)
+        with self.assertRaisesRegexp(PipettorException, "^invalid stdio specification object type: <type 'float'>$"):
+            pl = Pipeline([("date",), ("date",)], stdout=3.14159)
             pl.wait()
         self.commonChecks(nopen, None, None)
 
     def testBogusStderr(self):
         # test stderr specification is not legal
         nopen = self.numOpenFiles()
-        with self.assertRaisesRegexp(PipettorException, "^invalid stdio specification object type: <type 'float'>$") as cm:
-            pl = Pipeline([("date",),("date",)], stderr=3.14159)
+        with self.assertRaisesRegexp(PipettorException, "^invalid stdio specification object type: <type 'float'>$"):
+            pl = Pipeline([("date",), ("date",)], stderr=3.14159)
             pl.wait()
         self.commonChecks(nopen, None, None)
 
 
-        
 class PopenTests(TestCaseBase):
     def cpFileToPl(self, inName, pl):
         inf = self.getInputFile(inName)
@@ -239,14 +241,14 @@ class PopenTests(TestCaseBase):
         for line in fh:
             pl.write(line)
         fh.close()
-    
+
     def cpPlToFile(self, pl, outExt):
         outf = self.getOutputFile(outExt)
         fh = open(outf, "w")
         for line in pl:
             fh.write(line)
         fh.close()
-    
+
     def testWrite(self):
         outf = self.getOutputFile(".out")
         outfGz = self.getOutputFile(".out.gz")
@@ -275,10 +277,9 @@ class PopenTests(TestCaseBase):
 
         # grr, BSD wc adds an extract space, so just convert to tabs
         pl = Popen((("gzip", "-1"),
-                       ("gzip", "-dc"),
-                       ("wc",),
-                       ("sed", "-e", "s/  */\t/g")),
-                      "w", other=outf)
+                    ("gzip", "-dc"),
+                    ("wc",),
+                    ("sed", "-e", "s/  */\t/g")), "w", other=outf)
         self.cpFileToPl("simple1.txt", pl)
         pl.wait()
 
@@ -298,11 +299,10 @@ class PopenTests(TestCaseBase):
     def testReadMult(self):
         inf = self.getInputFile("simple1.txt")
 
-        pl = Popen((("gzip","-1c"),
-                       ("gzip", "-dc"),
-                       ("wc",),
-                       ("sed", "-e", "s/  */\t/g")),
-                      "r", other=inf)
+        pl = Popen((("gzip", "-1c"),
+                    ("gzip", "-dc"),
+                    ("wc",),
+                    ("sed", "-e", "s/  */\t/g")), "r", other=inf)
         self.cpPlToFile(pl, ".wc")
         pl.wait()
 
@@ -310,7 +310,7 @@ class PopenTests(TestCaseBase):
 
     def testExitCode(self):
         pl = Popen(("false",))
-        with self.assertRaisesRegexp(ProcessException, "^process exited 1: false$") as cm:
+        with self.assertRaisesRegexp(ProcessException, "^process exited 1: false$"):
             pl.wait()
         for p in pl.procs:
             self.assertTrue(p.returncode == 1)
@@ -319,7 +319,8 @@ class PopenTests(TestCaseBase):
         # test not reading all of pipe output
         pl = Popen([("yes",), ("true",)], "r")
         pl.wait()
-        
+
+
 def suite():
     ts = unittest.TestSuite()
     ts.addTest(unittest.makeSuite(PipelineTests))

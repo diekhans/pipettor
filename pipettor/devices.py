@@ -6,20 +6,21 @@ from __future__ import print_function
 import os
 import re
 import fcntl
-import stat
 import errno
 import threading
 import pickle
-from cStringIO import StringIO
 from pipettor.exceptions import PipettorException
 
 _rwa_re = re.compile("^[rwa]b?$")
 _rw_re = re.compile("^[rw]b?$")
+
+
 def _validate_mode(mode, allow_append):
     mode_re = _rwa_re if allow_append else _rw_re
     if mode_re.match(mode) is None:
         expect = "'r', 'w', or 'a'" if allow_append else "'r' or 'w'"
         raise PipettorException("invalid mode: '%s', expected %s with optional 'b' suffix" % (mode, expect))
+
 
 class Dev(object):
     """Base class for objects specifying process input or output.  They
@@ -43,10 +44,11 @@ class Dev(object):
     def post_exec_parent(self):
         "called do any post-exec handling in the parent"
         pass
-        
+
     def close(self):
         """close the device"""
         pass
+
 
 class DataReader(Dev):
     """Object to asynchronously read data from process into memory via a pipe.  A
@@ -77,12 +79,12 @@ class DataReader(Dev):
     def post_fork_child(self):
         """post-fork child setup."""
         self.read_fh.close()
-        
+
     def post_exec_parent(self):
         "called to do any post-exec handling in the parent"
         self.__thread = threading.Thread(target=self.__reader)
         self.__thread.start()
-        
+
     def close(self):
         "close pipes and terminate thread"
         if self.__thread is not None:
@@ -104,6 +106,7 @@ class DataReader(Dev):
         "return buffered data as a string"
         return "".join(self.__buffer)
 
+
 class DataWriter(Dev):
     """Object to asynchronously write data to process from memory via a pipe.  A
     thread is use to prevent deadlock when both reading and writing to a child
@@ -116,7 +119,7 @@ class DataWriter(Dev):
         self.read_fd, write_fd = os.pipe()
         self.write_fh = os.fdopen(write_fd, "wb")
         self.__thread = None
-        
+
     def __del__(self):
         "finalizer"
         self.close()
@@ -133,12 +136,12 @@ class DataWriter(Dev):
         """post-fork child setup."""
         self.write_fh.close()
         self.write_fh = None
-        
+
     def post_exec_parent(self):
         "called to do any post-exec handling in the parent"
         self.__thread = threading.Thread(target=self.__writer)
         self.__thread.start()
-        
+
     def close(self):
         "close pipes and terminate thread"
         if self.__thread is not None:
@@ -162,6 +165,7 @@ class DataWriter(Dev):
             if ex.errno != errno.EPIPE:
                 raise
 
+
 class File(Dev):
     """A file path for input or output, used for specifying stdio associated
     with files."""
@@ -178,12 +182,13 @@ class File(Dev):
         if self.__mode[0] == 'r':
             self.read_fd = os.open(self.__path, os.O_RDONLY)
         elif self.__mode[0] == 'w':
-            self.write_fd = os.open(self.__path, os.O_WRONLY|os.O_CREAT|os.O_TRUNC, 0o666)
+            self.write_fd = os.open(self.__path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o666)
         else:
-            self.write_fd = os.open(self.__path, os.O_WRONLY|os.O_CREAT|os.O_APPEND, 0o666)
+            self.write_fd = os.open(self.__path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o666)
 
     def __del__(self):
         self.close()
+
     def __str__(self):
         return self.__path
 
@@ -198,6 +203,7 @@ class File(Dev):
     def post_fork_parent(self):
         """post-fork child setup."""
         self.close()
+
 
 class _SiblingPipe(Dev):
     """Interprocess communication between two child process by anonymous
@@ -220,7 +226,7 @@ class _SiblingPipe(Dev):
         self.read_fd = None
         os.close(self.write_fd)
         self.write_fd = None
-        
+
     def close(self):
         if self.read_fd is not None:
             os.close(self.read_fd)
@@ -228,6 +234,7 @@ class _SiblingPipe(Dev):
         if self.write_fd is not None:
             os.close(self.write_fd)
             self.write_fd = None
+
 
 class _StatusPipe(object):
     """One-way communicate from parent and child during setup.  Close-on-exec is set,
@@ -245,22 +252,22 @@ class _StatusPipe(object):
             raise
 
     @staticmethod
-    def __set_close_on_exec( fh):
+    def __set_close_on_exec(fh):
         flags = fcntl.fcntl(fh.fileno(), fcntl.F_GETFD)
-        fcntl.fcntl(fh.fileno(), fcntl.F_SETFD, flags|fcntl.FD_CLOEXEC)
+        fcntl.fcntl(fh.fileno(), fcntl.F_SETFD, flags | fcntl.FD_CLOEXEC)
 
     def __del__(self):
         self.close()
-    
+
     def close(self):
         "close pipes if open"
-        if self.read_fh != None:
+        if self.read_fh is not None:
             self.read_fh.close()
             self.read_fh = None
-        if self.write_fh != None:
+        if self.write_fh is not None:
             self.write_fh.close()
             self.write_fh = None
-        
+
     def post_fork_parent(self):
         "post fork handling in parent"
         self.write_fh.close()
@@ -282,4 +289,3 @@ class _StatusPipe(object):
             return pickle.load(self.read_fh)
         except EOFError:
             return None
-

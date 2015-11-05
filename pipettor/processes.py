@@ -9,8 +9,14 @@ import signal
 import errno
 import traceback
 import pipes
-from pipettor.devices import _validate_mode, Dev, DataReader, DataWriter, _SiblingPipe, File, _StatusPipe
-from pipettor.exceptions import PipettorException, ProcessException
+from pipettor.devices import _validate_mode
+from pipettor.devices import Dev
+from pipettor.devices import DataReader
+from pipettor.devices import _SiblingPipe
+from pipettor.devices import File
+from pipettor.devices import _StatusPipe
+from pipettor.exceptions import PipettorException
+from pipettor.exceptions import ProcessException
 
 
 # Why better that subprocess:
@@ -22,13 +28,15 @@ try:
 except:
     MAXFD = 256
 
+
 class _SetpgidCompleteMsg(object):
     "message sent to by first process to indicate that setpgid is complete"
     pass
-    
+
+
 class Process(object):
     """A process, represented as a node a pipeline Proc objects, connected by
-    Dev objects. 
+    Dev objects.
 
     Process arguments can be can be any object, with str() being called on
     the object before exec.
@@ -58,7 +66,7 @@ class Process(object):
         self.pgid = None
         self.status_pipe = None
         self.returncode = None  # exit code, or -signal
-        self.exceptinfo = None # (exception, value, traceback)
+        self.exceptinfo = None  # (exception, value, traceback)
         self.started = False
         self.finished = False
         self.forced = False    # force termination during error cleanup
@@ -73,7 +81,7 @@ class Process(object):
     def __stdio_assoc(self, spec, mode):
         """pre-fork check a stdio spec validity and associate Dev or file
         number.  mode is mode in child"""
-        if (spec is None) or isinstance(spec, int) or  isinstance(spec, Dev):
+        if (spec is None) or isinstance(spec, int) or isinstance(spec, Dev):
             return spec  # passed unchanged
         elif callable(getattr(spec, "fileno", None)):
             return spec.fileno()  # is file-like
@@ -110,7 +118,8 @@ class Process(object):
             try:
                 if fd not in keepOpen:
                     os.close(fd)
-            except: pass
+            except:
+                pass
 
     def __child_setup_devices(self):
         "post-fork setup of devices"
@@ -127,7 +136,7 @@ class Process(object):
             self.status_pipe.send(_SetpgidCompleteMsg())
         else:
             os.setpgid(self.pid, self.pgid)
-            
+
     def __child_exec(self):
         "guts of start child process"
         self.status_pipe.post_fork_child()
@@ -140,7 +149,7 @@ class Process(object):
         # FIXME: might want to reset other signals
         signal.signal(signal.SIGPIPE, signal.SIG_DFL)  # ensure terminate on pipe close
         os.execvp(self.cmd[0], self.cmd)
-            
+
     def __child_do_exec(self):
         " in child process"
         try:
@@ -159,9 +168,9 @@ class Process(object):
             self.__child_do_exec()
         except Exception as ex:
             # FIXME: make something
-            sys.stderr.write("child process exec error handling logic error: " +str(ex)+"\n")
+            sys.stderr.write("child process exec error handling logic error: " + str(ex)+"\n")
         finally:
-            os.abort() # should never make it here
+            os.abort()  # should never make it here
 
     def __parent_setup_process_group_leader(self):
         status = self.status_pipe.receive()
@@ -205,7 +214,7 @@ class Process(object):
         """wait on exec to happen, receive status from child raising the
         exception if one was send"""
         ex = self.status_pipe.receive()
-        if ex != None:
+        if ex is not None:
             if not isinstance(ex, Exception):
                 ex = PipettorException("unexpected object return from child exec status pipe: %s: %s" % (str(type(ex)), str(ex)))
             if not isinstance(ex, ProcessException):
@@ -213,7 +222,7 @@ class Process(object):
             raise ex
         self.status_pipe.close()
 
-    def running():
+    def running(self):
         "determined if this process has been started, but not finished"
         return self.started and not self.finished
 
@@ -230,7 +239,7 @@ class Process(object):
         # don't save exception if we force it to be ill
         if not self.forced:
             self.exceptinfo = (ProcessException(str(self), self.returncode, stderr), None, None)
-        
+
     def _handle_exit(self, waitStat):
         """Handle process exiting, saving status  """
         self.finished = True
@@ -266,6 +275,7 @@ class Process(object):
         "check if process failed, call after poll() or wait()"
         return (self.exceptInfo is not None)
 
+
 class Pipeline(object):
     """A process pipeline."""
     def __init__(self, cmds, stdin=None, stdout=None, stderr=None):
@@ -281,11 +291,11 @@ class Pipeline(object):
         self.stderr = stderr
         self.procs = []
         self.devs = set()
-        self.pgid = None      # process group leader
-        self.bypid = dict()   # indexed by pid
-        self.started = False  # have processes been started
-        self.running = False  # processes are running (or wait has not been called)
-        self.finished = False # have all processes finished
+        self.pgid = None       # process group leader
+        self.bypid = dict()    # indexed by pid
+        self.started = False   # have processes been started
+        self.running = False   # processes are running (or wait has not been called)
+        self.finished = False  # have all processes finished
 
         if isinstance(cmds[0], str):
             cmds = [cmds]  # one-process pipeline
@@ -299,9 +309,8 @@ class Pipeline(object):
         prevPipe = None
         lastCmdIdx = len(cmds)-1
         for i in xrange(len(cmds)):
-            prevPipe = self.__add_process(cmds[i], prevPipe, (i==lastCmdIdx), self.stdin, self.stdout, self.stderr)
-            
-            
+            prevPipe = self.__add_process(cmds[i], prevPipe, (i == lastCmdIdx), self.stdin, self.stdout, self.stderr)
+
     def __add_process(self, cmd, prevPipe, isLastCmd, stdinFirst, stdoutLast, stderr):
         """add one process to the pipeline, return the output pipe if not the last process"""
         if prevPipe is None:
@@ -310,14 +319,14 @@ class Pipeline(object):
             stdin = prevPipe
         if isLastCmd:
             outPipe = None
-            stdout = stdoutLast # last process in pipeline
+            stdout = stdoutLast  # last process in pipeline
         else:
             outPipe = _SiblingPipe()
             stdout = outPipe
         try:
             self.__create_process(cmd, stdin, stdout, stderr)
         except:
-            if outPipe != None:
+            if outPipe is not None:
                 outPipe.close()
             raise
         return outPipe
@@ -326,9 +335,9 @@ class Pipeline(object):
         """create process and track Dev objects"""
         proc = Process(cmd, stdin, stdout, stderr)
         self.procs.append(proc)
-        if self.pgid == None:
+        if self.pgid is None:
             self.pgid = proc.pgid
-        # Proc maybe have wrapped a Dev 
+        # Proc maybe have wrapped a Dev
         for std in (proc.stdin, proc.stdout, proc.stderr):
             if isinstance(std, Dev):
                 self.devs.add(std)
@@ -345,7 +354,7 @@ class Pipeline(object):
         if self.stderr not in (None, 2):
             desc += " 2>"+str(self.stderr)
         return desc
-        
+
     def __post_fork_parent(self):
         for d in self.devs:
             d.post_fork_parent()
@@ -353,8 +362,8 @@ class Pipeline(object):
     def __start_process(self, proc):
         proc._start(self.pgid)
         self.bypid[proc.pid] = proc
-        assert(proc.pgid != None)
-        if self.pgid == None:
+        assert(proc.pgid is not None)
+        if self.pgid is None:
             self.pgid = proc.pgid
 
     def __start(self):
@@ -383,14 +392,14 @@ class Pipeline(object):
             # FIXME: use logging or warning
             exi = sys.exc_info()
             stack = "" if exi is None else "".join(traceback.format_list(traceback.extract_tb(exi[2])))+"\n"
-            sys.stderr.write("pipettor dev cleanup exception: " +str(ex)+"\n"+stack)
+            sys.stderr.write("pipettor dev cleanup exception: " + str(ex) + "\n" + stack)
 
     def __error_cleanup_process(self, proc):
         try:
             proc._force_finish()
         except Exception as ex:
             # FIXME: make optional
-            sys.stderr.write("pipeline prococess cleanup exception: " +str(ex)+"\n")
+            sys.stderr.write("pipeline prococess cleanup exception: " + str(ex) + "\n")
 
     def __error_cleanup(self):
         """forced cleanup of child processed after failure"""
@@ -426,7 +435,7 @@ class Pipeline(object):
             if not p.poll():
                 return False
         self.__finish()
-        
+
     def poll(self):
         """Check if all of the processes have completed.  Return True if it
         has, False if it hasn't."""
@@ -455,7 +464,7 @@ class Pipeline(object):
         while self.__wait_on_one():
             pass
         self.__finish()
-    
+
     def wait(self):
         """Wait for all of the process to complete. Generate an exception if
         any exits non-zero or signals. Starts process if not already
@@ -479,7 +488,8 @@ class Pipeline(object):
     def kill(self, sig=signal.SIGTERM):
         "send a signal to all of the processes in the pipeline"
         os.kill(-self.pgid, sig)
-        
+
+
 class Popen(Pipeline):
     """File-like object of processes to read from or write to a Pipeline.
     """
@@ -491,10 +501,10 @@ class Popen(Pipeline):
         have data written to it.  If other is specified, and is a string,
         it is a file to open as other file at the other end of the pipeline.
         If it's not a string, it is assumed to be a file object to use for output.
-        
+
         read pipeline ('r'):
           other --> cmd[0] --> ... --> cmd[n] --> Popen
-        
+
         write pipeline ('w')
           Popen --> cmd[0] --> ... --> cmd[n] --> other
 
@@ -530,7 +540,7 @@ class Popen(Pipeline):
         if self.__child_fd is not None:
             os.close(self.__child_fd)
             self.__child_fd = None
-        
+
     def __enter__(self):
         "support for with statement"
         return self
@@ -545,7 +555,7 @@ class Popen(Pipeline):
 
     def next(self):
         return self.__parent_fh.next()
-  
+
     def flush(self):
         "Flush the internal I/O buffer."
         self.__parent_fh.flush()
@@ -553,7 +563,7 @@ class Popen(Pipeline):
     def fileno(self):
         "get the integer OS-dependent file handle"
         return self.__parent_fh.fileno()
-  
+
     def write(self, str):
         "Write string str to file."
         self.__parent_fh.write(str)
@@ -588,9 +598,3 @@ class Popen(Pipeline):
         self.__close()
         if not self.finished:
             self.wait()
-            
-
-# FIXME:
-# __all__ = [ProcessException.__name__, PIn.__name__, POut.__name__, Dev.__name__,
-#            DataReader.__name__, DataWriter.__name__, Pipe.__name__, File.__name__,
-#            Proc.__name__, ProcDag.__name__, Procline.__name__, Pipeline.__name__]

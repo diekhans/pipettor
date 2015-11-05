@@ -3,6 +3,7 @@ import sys
 import traceback
 import signal
 
+
 def _signal_num_to_name(num):
     "get name for a signal number"
     # find name in signal namespace
@@ -10,6 +11,7 @@ def _signal_num_to_name(num):
         if (getattr(signal, key) == num) and key.startswith("SIG") and (key.find("_") < 0):
             return key
     return "signal"+str(num)
+
 
 class PipettorException(Exception):
     """Base class for exceptions.  This implements exception chaining and
@@ -37,7 +39,7 @@ class PipettorException(Exception):
         "recursively construct message for chained exception"
         desc = self.msg
         if self.cause is not None:
-            desc += ",\n    caused by: " + self.cause.__class__.__name__ + ": " +  str(self.cause)
+            desc += ",\n    caused by: " + self.cause.__class__.__name__ + ": " + str(self.cause)
         return desc
 
     def format(self):
@@ -53,7 +55,7 @@ class PipettorException(Exception):
         if isinstance(ex, PipettorException):
             desc += ex.msg + "\n"
         else:
-            desc +=  str(ex) +  "\n"
+            desc += str(ex) + "\n"
         st = getattr(ex, "stackTrace", None)
         if st is not None:
             if doneStacks is None:
@@ -66,6 +68,7 @@ class PipettorException(Exception):
         if ca is not None:
             desc += "caused by: " + PipettorException.formatExcept(ca, doneStacks)
         return desc
+
 
 class ProcessException(PipettorException):
     """Exception associated with running a process.  A None returncode indicates
@@ -84,4 +87,3 @@ class ProcessException(PipettorException):
         if (stderr is not None) and (len(stderr) != 0):
             msg += ":\n" + stderr
         PipettorException.__init__(self, msg, cause=cause)
-

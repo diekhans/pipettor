@@ -5,9 +5,9 @@ Credits
 Development Lead
 ----------------
 
-* Mark Diekhans <markd@kermodei.com>
+* Mark Diekhans <markd@ucsc.edu>
 
 Contributors
 ------------
 
-None yet. Why not be the first?
+
