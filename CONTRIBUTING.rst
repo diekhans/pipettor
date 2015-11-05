@@ -17,9 +17,9 @@ Report bugs at https://github.com/diekhans/pipettor/issues.
 
 If you are reporting a bug, please include:
 
-* Your operating system name and version.
-* Any details about your local setup that might be helpful in troubleshooting.
-* Detailed steps to reproduce the bug.
+1. Your operating system name and version.
+2. Any details about your local setup that might be helpful in troubleshooting.
+3. Detailed steps to reproduce the bug.
 
 Fix Bugs
 ~~~~~~~~
@@ -106,6 +106,10 @@ Before you submit a pull request, check that it meets these guidelines:
 Tips
 ----
 
-To run a subset of tests::
+To run a subset of tests, supply the test class::
 
-    $ python -m unittest tests.test_pipettor
+    $ python -m unittest tests.pipettorTests.PipelineTests
+
+To run a single of test, supply the test function::
+
+    $ python -m unittest tests.pipettorTests.PipelineTests.testTrivial
