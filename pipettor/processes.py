@@ -88,7 +88,7 @@ class Process(object):
         elif isinstance(spec, str) or isinstance(spec, unicode):
             return File(spec, mode)
         else:
-            raise PipettorException("invalid stdio specification object type: " + str(type(spec)))
+            raise PipettorException("invalid stdio specification object type: " + str(type(spec)) + " " + str(spec))
 
     def __stdio_child_setup(self, spec, stdfd):
         """post-fork setup one of the stdio fds."""
@@ -279,13 +279,25 @@ class Process(object):
 class Pipeline(object):
     """A process pipeline."""
     def __init__(self, cmds, stdin=None, stdout=None, stderr=None):
-        """cmds is either a list of arguments for a single process, or a list
-        of such lists for a pipeline. If the stdin/out/err arguments are none,
-        the open files are are inherited.  Otherwise they can be string file names, a
-        file-like object, a file number, a Dev object.  Stdin is input to the
-        first process, stdout is output to the last process and stderr is
-        attached to all processed. DataReader and DataWriter objects can be specified
-        for stdin/out/err asynchronously I/O with the pipeline without the danger of deadlock. """
+        """
+        Construct a process pipeline.  Once constructed, the pipeline
+        is started with start(), poll(), or wait() functions.
+
+        Cmds is either a list of arguments for a single process, or a list of such
+        lists for a pipeline. If the stdin/out/err arguments are none, the
+        open files are are inherited.  Otherwise they can be string file
+        names, file-like objects, file number, or Dev object.  Stdin is input
+        to the first process, stdout is output to the last process and stderr
+        is attached to all processed. DataReader and DataWriter objects can be
+        specified for stdin/out/err asynchronously I/O with the pipeline
+        without the danger of deadlock.
+
+        If stderr is the class DataReader, a new instance is created for each
+        process in the pipeline. The contents of stderr will include an
+        exception if an occurs in that process.  If an instance of DataReader
+        is provided, the contents of stderr from all process will be included in
+        the exception.
+        """
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
@@ -495,12 +507,12 @@ class Popen(Pipeline):
     """
 
     def __init__(self, cmds, mode='r', other=None):
-        """cmds is either a list of arguments for a single process, or
-        a list of such lists for a pipeline.  Mode is 'r' for a pipeline
-        who's output will be read, or 'w' for a pipeline to that is to
-        have data written to it.  If other is specified, and is a string,
-        it is a file to open as other file at the other end of the pipeline.
-        If it's not a string, it is assumed to be a file object to use for output.
+        """cmds is either a list of arguments for a single process, or a list of such
+        lists for a pipeline.  Mode is 'r' for a pipeline who's output will be
+        read, or 'w' for a pipeline to that is to have data written to it.  If
+        other is specified, and is a string, it is a file to open as other
+        file at the other end of the pipeline.  If it's not a string, it is
+        assumed to be a file object to use for output.
 
         read pipeline ('r'):
           other --> cmd[0] --> ... --> cmd[n] --> Popen

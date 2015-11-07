@@ -4,9 +4,9 @@ include HISTORY.rst
 include LICENSE
 include README.rst
 
-recursive-include pipettor
+recursive-include pipettor *.py
 recursive-include tests *
 recursive-exclude tests output/*
 recursive-exclude * *.py[co]
 
-recursive-include docs *.rst conf.py Makefile make.bat
+recursive-include docs *.rst conf.py Makefile
