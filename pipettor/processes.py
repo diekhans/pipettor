@@ -594,8 +594,8 @@ class Popen(Pipeline):
     def wait(self):
         """wait to for processes to complete, generate an exception if one
         exits no-zero"""
-        Pipeline.wait(self)
         self.__close()
+        Pipeline.wait(self)
 
     def poll(self):
         "poll is not allowed for Pipeline objects"
