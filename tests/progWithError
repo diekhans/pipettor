@@ -1,0 +1,4 @@
+#!/bin/sh
+# generates an error
+echo "THIS GOES TO STDERR" >&2
+exit 1

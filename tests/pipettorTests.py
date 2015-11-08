@@ -88,11 +88,11 @@ class PipelineTests(PipettorTestBase):
     def testPipeFailStderr(self):
         nopen = self.numOpenFiles()
         # should report first failure
-        pl = Pipeline([("true",), ("sh", "-c", "echo this goes to stderr >&2; exit 1",), ("false",)], stderr=DataReader)
+        pl = Pipeline([("true",), (os.path.join(self.getTestDir(), "progWithError"),), ("false",)], stderr=DataReader)
         with self.assertRaises(ProcessException) as cm:
             pl.wait()
         msg = str(cm.exception)
-        expectRe = "^process exited 1: sh -c 'echo this goes to stderr >&2; exit 1':\nthis goes to stderr$"
+        expectRe = "^process exited 1: .+/progWithError:\nTHIS GOES TO STDERR$"
         if not re.match(expectRe, msg, re.MULTILINE):
             self.fail("'" + msg + "' does not match '" + str(expectRe))
         self.orphanChecks(nopen)
@@ -163,12 +163,12 @@ class PipelineTests(PipettorTestBase):
         nopen = self.numOpenFiles()
         stdoutRd = DataReader()
         stderrRd = DataReader()
-        pl = Pipeline(("bash", "-c", "echo this goes to stdout; echo this goes to stderr >&2"),
+        pl = Pipeline(("sh", "-c", "echo this goes to stdout; echo this goes to stderr >&2"),
                       stdout=stdoutRd, stderr=stderrRd)
         pl.wait()
         self.assertEqual(stdoutRd.data, "this goes to stdout\n")
         self.assertEqual(stderrRd.data, "this goes to stderr\n")
-        self.commonChecks(nopen, pl, "bash -c 'echo this goes to stdout; echo this goes to stderr >&2' >[DataReader] 2>[DataReader]")
+        self.commonChecks(nopen, pl, "sh -c 'echo this goes to stdout; echo this goes to stderr >&2' >[DataReader] 2>[DataReader]")
 
     def testStdinMemBinary(self):
         # binary write from memory to stdin
@@ -384,9 +384,9 @@ class FunctionTests(PipettorTestBase):
         nopen = self.numOpenFiles()
         inf = self.getInputFile("simple1.txt")
         with self.assertRaises(ProcessException) as cm:
-            call_output([("sort", "-r"), ("sh", "-c", "echo this goes to stderr >&2; exit 1",), ("false",)], stdin=inf)
+            call_output([("sort", "-r"), (os.path.join(self.getTestDir(), "progWithError"),), ("false",)], stdin=inf)
         msg = str(cm.exception)
-        expectRe = "^process exited 1: sh -c 'echo this goes to stderr >&2; exit 1':\nthis goes to stderr$"
+        expectRe = """^process exited 1: .+/progWithError:\nTHIS GOES TO STDERR$"""
         if not re.match(expectRe, msg, re.MULTILINE):
             self.fail("'" + msg + "' does not match '" + str(expectRe))
         self.orphanChecks(nopen)

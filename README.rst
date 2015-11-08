@@ -11,10 +11,11 @@ pipettor
 
 pipettor - robust, easy to use Unix process pipelines
 
-* Free software: MIT license
-* Documentation: https://pipettor.readthedocs.org.
-
 Features
 --------
 
 * TODO
+
+* Free software: MIT license
+* Documentation: https://pipettor.readthedocs.org.
+

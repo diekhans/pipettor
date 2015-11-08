@@ -51,10 +51,11 @@ class Process(object):
     If stderr is an instance of DataReader, then stderr is included in
     ProcessException on process error.  If the class DataReader is passed
     in as stderr, a DataReader object is created.
+
+    start() must be called to run process
     """
 
     def __init__(self, cmd, stdin=None, stdout=None, stderr=None):
-        """Setup process. start() must be call to start process."""
         self.cmd = tuple(cmd)
         # stdio and argument Dev association
         self.stdin = self.__stdio_assoc(stdin, "r")
@@ -125,7 +126,7 @@ class Process(object):
         "post-fork setup of devices"
         for std in (self.stdin, self.stdout, self.stderr):
             if isinstance(std, Dev):
-                std.post_fork_child()
+                std._post_fork_child()
 
     def __child_setup_process_group(self):
         """setup process group, if this is the first process, it becomes the
@@ -139,7 +140,7 @@ class Process(object):
 
     def __child_exec(self):
         "guts of start child process"
-        self.status_pipe.post_fork_child()
+        self.status_pipe._post_fork_child()
         self.__child_setup_process_group()
         self.__child_setup_devices()
         self.__stdio_child_setup(self.stdin, 0)
@@ -185,7 +186,7 @@ class Process(object):
 
     def __parent_start(self):
         "start in parent process"
-        self.status_pipe.post_fork_parent()
+        self.status_pipe._post_fork_parent()
         if self.pgid is None:
             # first process is process leader.
             self.__parent_setup_process_group_leader()
@@ -208,7 +209,7 @@ class Process(object):
         except:
             self.exceptinfo = sys.exc_info()
         if self.exceptinfo is not None:
-            self.raise_if_failed()
+            self._raise_if_failed()
 
     def _execwait(self):
         """wait on exec to happen, receive status from child raising the
@@ -226,7 +227,7 @@ class Process(object):
         "determined if this process has been started, but not finished"
         return self.started and not self.finished
 
-    def raise_if_failed(self):
+    def _raise_if_failed(self):
         """raise exception if one is saved, otherwise do nothing"""
         if self.exceptinfo is not None:
             raise self.exceptinfo[0], self.exceptinfo[1], self.exceptinfo[2]
@@ -277,27 +278,26 @@ class Process(object):
 
 
 class Pipeline(object):
-    """A process pipeline."""
+    """
+    A process pipeline.  Once constructed, the pipeline
+    is started with start(), poll(), or wait() functions.
+
+    Cmds is either a list of arguments for a single process, or a list of such
+    lists for a pipeline. If the stdin/out/err arguments are none, the
+    open files are are inherited.  Otherwise they can be string file
+    names, file-like objects, file number, or Dev object.  Stdin is input
+    to the first process, stdout is output to the last process and stderr
+    is attached to all processed. DataReader and DataWriter objects can be
+    specified for stdin/out/err asynchronously I/O with the pipeline
+    without the danger of deadlock.
+
+    If stderr is the class DataReader, a new instance is created for each
+    process in the pipeline. The contents of stderr will include an
+    exception if an occurs in that process.  If an instance of DataReader
+    is provided, the contents of stderr from all process will be included in
+    the exception.
+    """
     def __init__(self, cmds, stdin=None, stdout=None, stderr=None):
-        """
-        Construct a process pipeline.  Once constructed, the pipeline
-        is started with start(), poll(), or wait() functions.
-
-        Cmds is either a list of arguments for a single process, or a list of such
-        lists for a pipeline. If the stdin/out/err arguments are none, the
-        open files are are inherited.  Otherwise they can be string file
-        names, file-like objects, file number, or Dev object.  Stdin is input
-        to the first process, stdout is output to the last process and stderr
-        is attached to all processed. DataReader and DataWriter objects can be
-        specified for stdin/out/err asynchronously I/O with the pipeline
-        without the danger of deadlock.
-
-        If stderr is the class DataReader, a new instance is created for each
-        process in the pipeline. The contents of stderr will include an
-        exception if an occurs in that process.  If an instance of DataReader
-        is provided, the contents of stderr from all process will be included in
-        the exception.
-        """
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
@@ -369,7 +369,7 @@ class Pipeline(object):
 
     def __post_fork_parent(self):
         for d in self.devs:
-            d.post_fork_parent()
+            d._post_fork_parent()
 
     def __start_process(self, proc):
         proc._start(self.pgid)
@@ -388,7 +388,7 @@ class Pipeline(object):
 
     def __post_exec_parent(self):
         for d in self.devs:
-            d.post_exec_parent()
+            d._post_exec_parent()
 
     def __finish(self):
         "finish up when no errors have occurred"
@@ -437,10 +437,10 @@ class Pipeline(object):
             self.__error_cleanup()
             raise
 
-    def raise_if_failed(self):
+    def _raise_if_failed(self):
         """raise exception if any process has one, otherwise do nothing"""
         for p in self.procs:
-            p.raise_if_failed()
+            p._raise_if_failed()
 
     def __poll(self):
         for p in self.procs:
@@ -488,7 +488,7 @@ class Pipeline(object):
         except:
             self.__error_cleanup()
             raise
-        self.raise_if_failed()
+        self._raise_if_failed()
 
     def failed(self):
         "check if any process failed, call after poll() or wait()"
@@ -504,6 +504,8 @@ class Pipeline(object):
 
 class Popen(Pipeline):
     """File-like object of processes to read from or write to a Pipeline.
+
+    .. automethod:: __init__
     """
 
     def __init__(self, cmds, mode='r', other=None):
@@ -580,11 +582,6 @@ class Popen(Pipeline):
         "Write string str to file."
         self.__parent_fh.write(str)
 
-    def writeln(self, str):
-        "Write string str to file followed by a newline."
-        self.__parent_fh.write(str)
-        self.__parent_fh.write("\n")
-
     def read(self, size=-1):
         return self.__parent_fh.read(size)
 
@@ -597,8 +594,8 @@ class Popen(Pipeline):
     def wait(self):
         """wait to for processes to complete, generate an exception if one
         exits no-zero"""
-        self.__close()
         Pipeline.wait(self)
+        self.__close()
 
     def poll(self):
         "poll is not allowed for Pipeline objects"

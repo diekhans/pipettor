@@ -33,15 +33,15 @@ class Dev(object):
        write_fd - file integer descriptor for writing
        write_fh - file object for writing"""
 
-    def post_fork_parent(self):
+    def _post_fork_parent(self):
         """post-fork parent setup."""
         pass
 
-    def post_fork_child(self):
+    def _post_fork_child(self):
         """post-fork child setup."""
         pass
 
-    def post_exec_parent(self):
+    def _post_exec_parent(self):
         "called do any post-exec handling in the parent"
         pass
 
@@ -71,16 +71,16 @@ class DataReader(Dev):
     def __str__(self):
         return "[DataReader]"
 
-    def post_fork_parent(self):
+    def _post_fork_parent(self):
         """post-fork parent setup."""
         os.close(self.write_fd)
         self.write_fd = None
 
-    def post_fork_child(self):
+    def _post_fork_child(self):
         """post-fork child setup."""
         self.read_fh.close()
 
-    def post_exec_parent(self):
+    def _post_exec_parent(self):
         "called to do any post-exec handling in the parent"
         self.__thread = threading.Thread(target=self.__reader)
         self.__thread.start()
@@ -127,17 +127,17 @@ class DataWriter(Dev):
     def __str__(self):
         return "[DataWriter]"
 
-    def post_fork_parent(self):
+    def _post_fork_parent(self):
         """post-fork parent setup."""
         os.close(self.read_fd)
         self.read_fd = None
 
-    def post_fork_child(self):
+    def _post_fork_child(self):
         """post-fork child setup."""
         self.write_fh.close()
         self.write_fh = None
 
-    def post_exec_parent(self):
+    def _post_exec_parent(self):
         "called to do any post-exec handling in the parent"
         self.__thread = threading.Thread(target=self.__writer)
         self.__thread.start()
@@ -193,6 +193,7 @@ class File(Dev):
         return self.__path
 
     def close(self):
+        "close file if open"
         if self.read_fd is not None:
             os.close(self.read_fd)
             self.read_fd = None
@@ -200,7 +201,7 @@ class File(Dev):
             os.close(self.write_fd)
             self.write_fd = None
 
-    def post_fork_parent(self):
+    def _post_fork_parent(self):
         """post-fork child setup."""
         self.close()
 
@@ -220,7 +221,7 @@ class _SiblingPipe(Dev):
     def __str__(self):
         return "[Pipe]"
 
-    def post_exec_parent(self):
+    def _post_exec_parent(self):
         "called to do any post-exec handling in the parent"
         os.close(self.read_fd)
         self.read_fd = None
@@ -268,12 +269,12 @@ class _StatusPipe(object):
             self.write_fh.close()
             self.write_fh = None
 
-    def post_fork_parent(self):
+    def _post_fork_parent(self):
         "post fork handling in parent"
         self.write_fh.close()
         self.write_fh = None
 
-    def post_fork_child(self):
+    def _post_fork_child(self):
         "post fork handling in child"
         self.read_fh.close()
         self.read_fh = None
