@@ -99,6 +99,7 @@ class DataReader(Dev):
 
     def __reader(self):
         "child read thread function"
+        assert self.write_fd is None
         self.__buffer.append(self.read_fh.read())
 
     @property
@@ -156,6 +157,7 @@ class DataWriter(Dev):
 
     def __writer(self):
         "write thread function"
+        assert self.read_fd is None
         try:
             self.write_fh.write(self.__data)
             self.write_fh.close()
