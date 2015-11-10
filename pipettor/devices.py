@@ -55,8 +55,6 @@ class DataReader(Dev):
     thread is use to prevent deadlock when both reading and writing to a child
     pipeline.
     """
-    # FIXME: show DataReader object be passable to multiple process?
-    # FIXME make sure it can handled binary data
     def __init__(self):
         Dev.__init__(self)
         read_fd, self.write_fd = os.pipe()
@@ -97,10 +95,30 @@ class DataReader(Dev):
             os.close(self.write_fd)
             self.write_fd = None
 
-    def __reader(self):
+    def __reader_osx(self):
+        "child read thread function"
+        # OS/X version of reader.  This works around a problem where the
+        # tests with FunctionTests.testStdoutReadFail would occasionally
+        # fail because the output on stderr was lost.  Could not figure out
+        # why this happened, but used os.read() with a smallish buffer size
+        # seems to resolve it.
+        assert self.write_fd is None
+        while True:
+            d = os.read(self.read_fh.fileno(), 128)
+            if len(d) == 0:
+                break
+            self.__buffer.append(d)
+
+    def __reader_other(self):
         "child read thread function"
         assert self.write_fd is None
         self.__buffer.append(self.read_fh.read())
+
+    # pick reading function
+    if os.uname()[0] == "Darwin":
+        __reader = __reader_osx
+    else:
+        __reader = __reader_other
 
     @property
     def data(self):
