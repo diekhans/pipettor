@@ -7,7 +7,6 @@ import os
 import sys
 import signal
 import errno
-import traceback
 import pipes
 from pipettor.devices import _validate_mode
 from pipettor.devices import Dev
@@ -17,6 +16,7 @@ from pipettor.devices import File
 from pipettor.devices import _StatusPipe
 from pipettor.exceptions import PipettorException
 from pipettor.exceptions import ProcessException
+from pipettor.exceptions import _warn_error_during_error_handling
 
 
 # Why better that subprocess:
@@ -91,7 +91,7 @@ class Process(object):
         else:
             raise PipettorException("invalid stdio specification object type: " + str(type(spec)) + " " + str(spec))
 
-    def __stdio_child_setup(self, spec, stdfd):
+    def __child_stdio_setup(self, spec, stdfd):
         """post-fork setup one of the stdio fds."""
         fd = None
         if spec is None:
@@ -105,14 +105,14 @@ class Process(object):
                 fd = spec.write_fd
         if fd is None:
             # this should have been detected before forking
-            raise PipettorException("__stdio_child_setup logic error: %s %s" % (str(type(spec)), stdfd))
+            raise PipettorException("__child_stdio_setup logic error: %s %s" % (str(type(spec)), stdfd))
         # dup to target descriptor if not already there
         if fd != stdfd:
             os.dup2(fd, stdfd)
             # Don't close source file here, must delay closing in case stdout/err is same fd.
-            # Close is done by __close_files
+            # Close is done by __child_close_files
 
-    def __close_files(self):
+    def __child_close_files(self):
         "clone non-stdio files"
         keepOpen = set([self.status_pipe.write_fh.fileno()])
         for fd in xrange(3, MAXFD + 1):
@@ -121,6 +121,10 @@ class Process(object):
                     os.close(fd)
             except:
                 pass
+
+    def __child_set_signals(self):
+        # FIXME: might want to reset other signals
+        signal.signal(signal.SIGPIPE, signal.SIG_DFL)  # ensure terminate on pipe close
 
     def __child_setup_devices(self):
         "post-fork setup of devices"
@@ -143,12 +147,11 @@ class Process(object):
         self.status_pipe._post_fork_child()
         self.__child_setup_process_group()
         self.__child_setup_devices()
-        self.__stdio_child_setup(self.stdin, 0)
-        self.__stdio_child_setup(self.stdout, 1)
-        self.__stdio_child_setup(self.stderr, 2)
-        self.__close_files()
-        # FIXME: might want to reset other signals
-        signal.signal(signal.SIGPIPE, signal.SIG_DFL)  # ensure terminate on pipe close
+        self.__child_stdio_setup(self.stdin, 0)
+        self.__child_stdio_setup(self.stdout, 1)
+        self.__child_stdio_setup(self.stderr, 2)
+        self.__child_close_files()
+        self.__child_set_signals()
         os.execvp(self.cmd[0], self.cmd)
 
     def __child_do_exec(self):
@@ -156,8 +159,6 @@ class Process(object):
         try:
             self.__child_exec()
         except Exception as ex:
-            # FIXME: use isinstance(ex, ProcessException) causes error in python
-            # FIXME: lets see if it is fixed
             if not isinstance(ex, ProcessException):
                 ex = ProcessException(str(self), cause=ex)
             self.status_pipe.send(ex)
@@ -168,8 +169,7 @@ class Process(object):
         try:
             self.__child_do_exec()
         except Exception as ex:
-            # FIXME: make something
-            sys.stderr.write("child process exec error handling logic error: " + str(ex) + "\n")
+            _warn_error_during_error_handling("child process exec error handling logic error", ex)
         finally:
             os.abort()  # should never make it here
 
@@ -409,17 +409,13 @@ class Pipeline(object):
         try:
             dev.close()
         except Exception as ex:
-            # FIXME: use logging or warning
-            exi = sys.exc_info()
-            stack = "" if exi is None else "".join(traceback.format_list(traceback.extract_tb(exi[2]))) + "\n"
-            sys.stderr.write("pipettor dev cleanup exception: " + str(ex) + "\n" + stack)
+            _warn_error_during_error_handling("error during device cleanup on error", ex)
 
     def __error_cleanup_process(self, proc):
         try:
             proc._force_finish()
         except Exception as ex:
-            # FIXME: make optional
-            sys.stderr.write("pipeline prococess cleanup exception: " + str(ex) + "\n")
+            _warn_error_during_error_handling("error during process cleanup on error", ex)
 
     def __error_cleanup(self):
         """forced cleanup of child processed after failure"""
@@ -437,7 +433,6 @@ class Pipeline(object):
         # clean up devices and process if there is a failure
         try:
             self.__start()
-            # FIXME: really need both post fork and exec in parent
             self.__post_fork_parent()
             self.__exec_barrier()
             self.__post_exec_parent()

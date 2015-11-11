@@ -56,8 +56,6 @@ class DataReader(Dev):
     thread is use to prevent deadlock when both reading and writing to a child
     pipeline.
     """
-    # FIXME: show DataReader object be passable to multiple process?
-    # FIXME make sure it can handled binary data
     def __init__(self):
         Dev.__init__(self)
         read_fd, self.write_fd = os.pipe()

@@ -3,6 +3,7 @@ from __future__ import print_function
 import sys
 import traceback
 import signal
+from warnings import warn
 
 
 def _signal_num_to_name(num):
@@ -88,3 +89,15 @@ class ProcessException(PipettorException):
         if (stderr is not None) and (len(stderr) != 0):
             msg += ":\n" + stderr
         PipettorException.__init__(self, msg, cause=cause)
+
+
+class ErrorDuringErrorHandlingWarning(Warning):
+    """An error occurred while handing another error"""
+    pass
+
+
+def _warn_error_during_error_handling(msg, exception):
+    "called to issue warning on error during error handling"
+    exi = sys.exc_info()
+    stack = "" if exi is None else "".join(traceback.format_list(traceback.extract_tb(exi[2]))) + "\n"
+    warn(msg + " " + str(exception) + "\n" + stack, ErrorDuringErrorHandlingWarning)
