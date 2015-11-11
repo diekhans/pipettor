@@ -3,13 +3,13 @@ import unittest
 import sys
 import os
 import re
+import signal
 if __name__ == '__main__':
-    sys.path.insert(0, os.path.normpath(os.path.dirname(sys.argv[0]))+"/..")
+    sys.path.insert(0, os.path.normpath(os.path.dirname(sys.argv[0])) + "/..")
 from pipettor import Pipeline, Popen, ProcessException, PipettorException, DataReader, DataWriter, File, call, call_output
 from testCaseBase import TestCaseBase
 
 # this keeps OS/X crash reporter from popping up on unittest error
-import signal
 signal.signal(signal.SIGQUIT,
               lambda signum, frame: sys.exit(os.EX_SOFTWARE))
 signal.signal(signal.SIGABRT,
@@ -122,7 +122,7 @@ class PipelineTests(PipettorTestBase):
         if not msg.startswith(expect):
             self.fail("'" + msg + "' does not start with '"
                       + expect + "', cause: " + str(getattr(cm.exception, "cause", None)))
-        self.commonChecks(nopen, pl,  "sh -c 'kill -11 $$'")
+        self.commonChecks(nopen, pl, "sh -c 'kill -11 $$'")
 
     def testStdinMem(self):
         # write from memory to stdin

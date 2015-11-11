@@ -115,7 +115,7 @@ class Process(object):
     def __close_files(self):
         "clone non-stdio files"
         keepOpen = set([self.status_pipe.write_fh.fileno()])
-        for fd in xrange(3, MAXFD+1):
+        for fd in xrange(3, MAXFD + 1):
             try:
                 if fd not in keepOpen:
                     os.close(fd)
@@ -169,7 +169,7 @@ class Process(object):
             self.__child_do_exec()
         except Exception as ex:
             # FIXME: make something
-            sys.stderr.write("child process exec error handling logic error: " + str(ex)+"\n")
+            sys.stderr.write("child process exec error handling logic error: " + str(ex) + "\n")
         finally:
             os.abort()  # should never make it here
 
@@ -232,6 +232,13 @@ class Process(object):
         if self.exceptinfo is not None:
             raise self.exceptinfo[0], self.exceptinfo[1], self.exceptinfo[2]
 
+    def __parent_stdio_exit_close(self):
+        "close devices on edit"
+        # MUST do before reading stderr in __handle_error_exit
+        for std in (self.stdin, self.stdout, self.stderr):
+            if isinstance(std, Dev):
+                std.close()
+
     def __handle_error_exit(self):
         # get saved stderr, if possible
         stderr = None
@@ -246,6 +253,7 @@ class Process(object):
         self.finished = True
         assert(os.WIFEXITED(waitStat) or os.WIFSIGNALED(waitStat))
         self.returncode = os.WEXITSTATUS(waitStat) if os.WIFEXITED(waitStat) else -os.WTERMSIG(waitStat)
+        self.__parent_stdio_exit_close()  # MUST DO BEFORE __handle_error_exit
         if not ((self.returncode == 0) or (self.returncode == -signal.SIGPIPE)):
             self.__handle_error_exit()
         self.status_pipe.close()
@@ -319,7 +327,7 @@ class Pipeline(object):
 
     def __setup_processes(self, cmds):
         prevPipe = None
-        lastCmdIdx = len(cmds)-1
+        lastCmdIdx = len(cmds) - 1
         for i in xrange(len(cmds)):
             prevPipe = self.__add_process(cmds[i], prevPipe, (i == lastCmdIdx), self.stdin, self.stdout, self.stderr)
 
@@ -358,13 +366,13 @@ class Pipeline(object):
         """get a string describing the pipe"""
         desc = str(self.procs[0])
         if self.stdin not in (None, 0):
-            desc += " <"+str(self.stdin)
+            desc += " <" + str(self.stdin)
         if len(self.procs) > 1:
             desc += " | " + " | ".join([str(proc) for proc in self.procs[1:]])
         if self.stdout not in (None, 1):
-            desc += " >"+str(self.stdout)
+            desc += " >" + str(self.stdout)
         if self.stderr not in (None, 2):
-            desc += " 2>"+str(self.stderr)
+            desc += " 2>" + str(self.stderr)
         return desc
 
     def __post_fork_parent(self):
@@ -403,7 +411,7 @@ class Pipeline(object):
         except Exception as ex:
             # FIXME: use logging or warning
             exi = sys.exc_info()
-            stack = "" if exi is None else "".join(traceback.format_list(traceback.extract_tb(exi[2])))+"\n"
+            stack = "" if exi is None else "".join(traceback.format_list(traceback.extract_tb(exi[2]))) + "\n"
             sys.stderr.write("pipettor dev cleanup exception: " + str(ex) + "\n" + stack)
 
     def __error_cleanup_process(self, proc):

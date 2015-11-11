@@ -11,6 +11,7 @@ import threading
 import pickle
 from pipettor.exceptions import PipettorException
 
+
 _rwa_re = re.compile("^[rwa]b?$")
 _rw_re = re.compile("^[rw]b?$")
 

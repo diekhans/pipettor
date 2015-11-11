@@ -1,4 +1,5 @@
 # Copyright 2015 Mark Diekhans
+from __future__ import print_function
 import sys
 import traceback
 import signal
@@ -10,7 +11,7 @@ def _signal_num_to_name(num):
     for key in vars(signal):
         if (getattr(signal, key) == num) and key.startswith("SIG") and (key.find("_") < 0):
             return key
-    return "signal"+str(num)
+    return "signal" + str(num)
 
 
 class PipettorException(Exception):

@@ -54,7 +54,7 @@ class TestCaseBase(unittest.TestCase):
         unittest.TestCase.__init__(self, methodName)
         clId = self.getClassId()
         od = self.getOutputDir()
-        for f in glob.glob(od+"/"+clId + ".*") + glob.glob(od+"/tmp.*."+clId + ".*"):
+        for f in glob.glob(od + "/" + clId + ".*") + glob.glob(od + "/tmp.*." + clId + ".*"):
             rmTree(f)
 
     def getClassId(self):
@@ -80,7 +80,7 @@ class TestCaseBase(unittest.TestCase):
         # turn this into a relative directory
         cwd = os.getcwd()
         if testDir.startswith(cwd):
-            testDir = testDir[len(cwd)+1:]
+            testDir = testDir[len(cwd) + 1:]
             if len(testDir) == 0:
                 testDir = "."
         return testDir
@@ -196,7 +196,7 @@ class TestCaseBase(unittest.TestCase):
                 os.fstat(fd)
             except:
                 n += 1
-        return MAXFD-n
+        return MAXFD - n
 
     def assertNumOpenFilesSame(self, prevNumOpen):
         "assert that the number of open files has not changed"

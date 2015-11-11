@@ -1,11 +1,12 @@
 """
 Robust, easy to use Unix process pipelines.
 """
-__version__ = "0.1a"
-
+from __future__ import print_function
 from pipettor.exceptions import PipettorException, ProcessException
-from pipettor.devices import Dev, DataReader, DataWriter,  File
-from pipettor.processes import Pipeline,  Popen
+from pipettor.devices import Dev, DataReader, DataWriter, File
+from pipettor.processes import Pipeline, Popen
+
+__version__ = "0.1a"
 
 
 def call(cmds, stdin=None, stdout=None, stderr=DataReader):
