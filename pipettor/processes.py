@@ -503,7 +503,8 @@ class Pipeline(object):
         """Close down the pipeline prematurely. If the pipeline is running,
         it's killed.  This does not report errors from child process and
         differs from wait in the fact that it doesn't start the pipeline if it
-        has not been started, just frees up open pipes."""
+        has not been started, just frees up open pipes. Primary intended
+        for error recovery"""
         # FIXME: need to restructure some of this funcions
         if self.running:
             self.__error_cleanup()
