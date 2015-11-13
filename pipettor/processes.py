@@ -82,7 +82,13 @@ class Process(object):
     def __stdio_assoc(self, spec, mode):
         """pre-fork check a stdio spec validity and associate Dev or file
         number.  mode is mode in child"""
-        if (spec is None) or isinstance(spec, int) or isinstance(spec, Dev):
+        if (spec is None) or isinstance(spec, int):
+            return spec  # passed unchanged
+        elif isinstance(spec, Dev):
+            if mode.startswith("r"):
+                spec._bind_read_to_process(self)
+            else:
+                spec._bind_write_to_process(self)
             return spec  # passed unchanged
         elif callable(getattr(spec, "fileno", None)):
             return spec.fileno()  # is file-like
@@ -493,6 +499,17 @@ class Pipeline(object):
             raise
         self._raise_if_failed()
 
+    def shutdown(self):
+        """Close down the pipeline prematurely. If the pipeline is running,
+        it's killed.  This does not report errors from child process and
+        differs from wait in the fact that it doesn't start the pipeline if it
+        has not been started, just frees up open pipes."""
+        # FIXME: need to restructure some of this funcions
+        if self.running:
+            self.__error_cleanup()
+        else:
+            self.__finish()
+
     def failed(self):
         "check if any process failed, call after poll() or wait()"
         for p in self.procs:
@@ -542,7 +559,7 @@ class Popen(Pipeline):
             lastOut = other
             self.__child_fd = pipe_read_fd
             self.__parent_fh = os.fdopen(pipe_write_fd, mode)
-        Pipeline.__init__(self, cmds, stdin=firstIn, stdout=lastOut)
+        super(Popen, self).__init__(cmds, stdin=firstIn, stdout=lastOut)
         self.start()
         os.close(self.__child_fd)
         self.__child_fd = None

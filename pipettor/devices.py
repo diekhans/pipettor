@@ -1,4 +1,4 @@
-# Copyright 2015 Mark Diekhans
+# Copyright 2006-2015 Mark Diekhans
 """
 pipettor interfaces to files and pipes, as well as some other IPC stuff.
 """
@@ -34,6 +34,14 @@ class Dev(object):
        write_fd - file integer descriptor for writing
        write_fh - file object for writing"""
 
+    def _bind_read_to_process(self, process):
+        """associate read side with child process."""
+        pass
+
+    def _bind_write_to_process(self, process):
+        """associate write side with child process."""
+        pass
+
     def _post_fork_parent(self):
         """post-fork parent setup."""
         pass
@@ -57,9 +65,10 @@ class DataReader(Dev):
     pipeline.
     """
     def __init__(self):
-        Dev.__init__(self)
+        super(DataReader, self).__init__()
         read_fd, self.write_fd = os.pipe()
         self.read_fh = os.fdopen(read_fd, "rb")
+        self.__process = None
         self.__buffer = []
         self.__thread = None
 
@@ -69,6 +78,12 @@ class DataReader(Dev):
 
     def __str__(self):
         return "[DataReader]"
+
+    def _bind_write_to_process(self, process):
+        """associate write side with child process."""
+        if self.__process is not None:
+            raise PipettorException("DataReader already bound to a process")
+        self.__process = process
 
     def _post_fork_parent(self):
         """post-fork parent setup."""
@@ -114,11 +129,12 @@ class DataWriter(Dev):
     """
 
     def __init__(self, data):
-        Dev.__init__(self)
+        super(DataWriter, self).__init__()
         self.__data = data
         self.read_fd, write_fd = os.pipe()
         self.write_fh = os.fdopen(write_fd, "wb")
         self.__thread = None
+        self.__process = None
 
     def __del__(self):
         "finalizer"
@@ -126,6 +142,12 @@ class DataWriter(Dev):
 
     def __str__(self):
         return "[DataWriter]"
+
+    def _bind_read_to_process(self, process):
+        """associate write side with child process."""
+        if self.__process is not None:
+            raise PipettorException("DataWriter already bound to a process")
+        self.__process = process
 
     def _post_fork_parent(self):
         """post-fork parent setup."""
@@ -173,7 +195,7 @@ class File(Dev):
 
     def __init__(self, path, mode="r"):
         """constructor, mode is standard r,w, or a with optional, but meaningless, b"""
-        Dev.__init__(self)
+        super(File, self).__init__()
         self.__path = path
         self.__mode = mode
         # only one of the file descriptors is ever opened
@@ -212,7 +234,7 @@ class _SiblingPipe(Dev):
     pipes."""
 
     def __init__(self):
-        Dev.__init__(self)
+        super(_SiblingPipe, self).__init__()
         self.read_fd, self.write_fd = os.pipe()
 
     def __del__(self):

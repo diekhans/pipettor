@@ -1,4 +1,5 @@
-# Copyright 2006-2012 Mark Diekhans
+# Copyright 2006-2015 Mark Diekhans
+from __future__ import print_function
 import unittest
 import sys
 import os
@@ -18,6 +19,8 @@ signal.signal(signal.SIGABRT,
 
 class PipettorTestBase(TestCaseBase):
     "provide common functions used in test classes"
+    def __init__(self, methodName):
+        super(PipettorTestBase, self).__init__(methodName)
 
     def orphanChecks(self, nopen):
         "check for orphaned child process, open files or threads"
@@ -40,6 +43,9 @@ class PipettorTestBase(TestCaseBase):
 
 
 class PipelineTests(PipettorTestBase):
+    def __init__(self, methodName):
+        super(PipelineTests, self).__init__(methodName)
+
     def testTrivial(self):
         nopen = self.numOpenFiles()
         pl = Pipeline(("true",))
@@ -253,8 +259,30 @@ class PipelineTests(PipettorTestBase):
             pl.wait()
         self.orphanChecks(nopen)
 
+    def testDataReaderBogusShare(self):
+        # test stderr specification is not legal
+        nopen = self.numOpenFiles()
+        dr = DataReader()
+        with self.assertRaisesRegexp(PipettorException, "^DataReader already bound to a process$"):
+            pl = Pipeline([("date",), ("date",)], stdout=dr, stderr=dr)
+            pl.wait()
+        self.orphanChecks(nopen)
+
+    def testDataWriterBogusShare(self):
+        # test stderr specification is not legal
+        nopen = self.numOpenFiles()
+        dw = DataWriter("fred")
+        with self.assertRaisesRegexp(PipettorException, "^DataWriter already bound to a process$"):
+            pl1 = Pipeline([("cat", "/dev/null"), ("cat", "/dev/null")], stdin=dw)
+            Pipeline([("cat", "/dev/null"), ("cat", "/dev/null")], stdin=dw)
+        pl1.shutdown()  # clean up unstarted process
+        self.orphanChecks(nopen)
+
 
 class PopenTests(PipettorTestBase):
+    def __init__(self, methodName):
+        super(PopenTests, self).__init__(methodName)
+
     def cpFileToPl(self, inName, pl):
         inf = self.getInputFile(inName)
         fh = open(inf)
@@ -356,6 +384,9 @@ class PopenTests(PipettorTestBase):
 
 
 class FunctionTests(PipettorTestBase):
+    def __init__(self, methodName):
+        super(FunctionTests, self).__init__(methodName)
+
     def testWriteFile(self):
         # test write to File object
         nopen = self.numOpenFiles()

@@ -1,4 +1,4 @@
-# Copyright 2015 Mark Diekhans
+# Copyright 2006-2015 Mark Diekhans
 from __future__ import print_function
 import sys
 import traceback
@@ -27,12 +27,12 @@ class PipettorException(Exception):
     """
     def __init__(self, msg, cause=None):
         """Constructor."""
+        super(PipettorException, self).__init__(msg)
         if (cause is not None) and (not isinstance(cause, PipettorException)):
             # store stack trace in other Exception types
             exi = sys.exc_info()
             if exi is not None:
                 setattr(cause, "stackTrace", traceback.format_list(traceback.extract_tb(exi[2])))
-        Exception.__init__(self, msg)
         self.msg = msg
         self.cause = cause
         self.stackTrace = traceback.format_list(traceback.extract_stack())[0:-1]
@@ -88,7 +88,7 @@ class ProcessException(PipettorException):
             msg += ": " + procDesc
         if (stderr is not None) and (len(stderr) != 0):
             msg += ":\n" + stderr
-        PipettorException.__init__(self, msg, cause=cause)
+        super(ProcessException, self).__init__(msg, cause=cause)
 
 
 class ErrorDuringErrorHandlingWarning(Warning):

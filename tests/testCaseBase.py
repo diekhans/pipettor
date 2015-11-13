@@ -1,4 +1,5 @@
-# Copyright 2006-2012 Mark Diekhans
+# Copyright 2006-2015 Mark Diekhans
+from __future__ import print_function
 import os
 import sys
 import unittest
@@ -49,9 +50,9 @@ def ensureFileDir(fname):
 class TestCaseBase(unittest.TestCase):
     """Base class for test case with various test support functions"""
 
-    def __init__(self, methodName='runTest'):
+    def __init__(self, methodName):
         """initialize, removing old output files associated with the class"""
-        unittest.TestCase.__init__(self, methodName)
+        super(TestCaseBase, self).__init__(methodName=methodName)
         clId = self.getClassId()
         od = self.getOutputDir()
         for f in glob.glob(od + "/" + clId + ".*") + glob.glob(od + "/tmp.*." + clId + ".*"):
@@ -136,7 +137,7 @@ class TestCaseBase(unittest.TestCase):
         diff = difflib.unified_diff(expLines, outLines, expFile, outFile)
         cnt = 0
         for l in diff:
-            print l,
+            sys.stdout.write(l)
             cnt += 1
         self.assertTrue(cnt == 0)
 
