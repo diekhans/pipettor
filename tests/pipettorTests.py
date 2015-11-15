@@ -50,7 +50,7 @@ class PipelineTests(PipettorTestBase):
         nopen = self.numOpenFiles()
         pl = Pipeline(("true",))
         pl.wait()
-        self.commonChecks(nopen, pl, "true")
+        self.commonChecks(nopen, pl, "true 2>[DataReader]")
 
     def testTrivialPoll(self):
         nopen = self.numOpenFiles()
@@ -58,14 +58,14 @@ class PipelineTests(PipettorTestBase):
         while not pl.poll():
             pass
         pl.wait()
-        self.commonChecks(nopen, pl, "sleep 1")
+        self.commonChecks(nopen, pl, "sleep 1 2>[DataReader]")
 
     def testTrivialFailPoll(self):
         nopen = self.numOpenFiles()
         pl = Pipeline([("sleep", "1"), ("false",)])
         with self.assertRaisesRegexp(ProcessException, "^process exited 1: sleep 1 | false$"):
             pl.wait()
-        self.commonChecks(nopen, pl, "sleep 1 | false")
+        self.commonChecks(nopen, pl, "sleep 1 | false 2>[DataReader]")
 
     def testTrivialStatus(self):
         nopen = self.numOpenFiles()
@@ -76,20 +76,20 @@ class PipelineTests(PipettorTestBase):
         pl.wait()
         self.assertFalse(pl.running)
         self.assertTrue(pl.finished)
-        self.commonChecks(nopen, pl, "true")
+        self.commonChecks(nopen, pl, "true 2>[DataReader]")
 
     def testSimplePipe(self):
         nopen = self.numOpenFiles()
         pl = Pipeline([("true",), ("true",)])
         pl.wait()
-        self.commonChecks(nopen, pl, "true | true")
+        self.commonChecks(nopen, pl, "true | true 2>[DataReader]")
 
     def testSimplePipeFail(self):
         nopen = self.numOpenFiles()
         pl = Pipeline([("false",), ("true",)])
         with self.assertRaisesRegexp(ProcessException, "^process exited 1: false$"):
             pl.wait()
-        self.commonChecks(nopen, pl, "false | true")
+        self.commonChecks(nopen, pl, "false | true 2>[DataReader]")
 
     def testPipeFailStderr(self):
         nopen = self.numOpenFiles()
@@ -115,7 +115,7 @@ class PipelineTests(PipettorTestBase):
         if not msg.startswith(expect):
             self.fail("'" + msg + "' does not start with '"
                       + expect + "', cause: " + str(getattr(cm.exception, "cause", None)))
-        self.commonChecks(nopen, pl, "procDoesNotExist -r <[DataWriter]")
+        self.commonChecks(nopen, pl, "procDoesNotExist -r <[DataWriter] 2>[DataReader]")
 
     def testSignaled(self):
         # process signals
@@ -128,7 +128,7 @@ class PipelineTests(PipettorTestBase):
         if not msg.startswith(expect):
             self.fail("'" + msg + "' does not start with '"
                       + expect + "', cause: " + str(getattr(cm.exception, "cause", None)))
-        self.commonChecks(nopen, pl, "sh -c 'kill -11 $$'")
+        self.commonChecks(nopen, pl, "sh -c 'kill -11 $$' 2>[DataReader]")
 
     def testStdinMem(self):
         # write from memory to stdin
@@ -138,7 +138,7 @@ class PipelineTests(PipettorTestBase):
         pl = Pipeline(("sort", "-r"), stdin=dw, stdout=outf)
         pl.wait()
         self.diffExpected(".out")
-        self.commonChecks(nopen, pl, "^sort -r <\\[DataWriter\\] >.+/output/pipettorTests\\.PipelineTests\\.testStdinMem\\.out$", isRe=True)
+        self.commonChecks(nopen, pl, "^sort -r <\\[DataWriter\\] >.+/output/pipettorTests\\.PipelineTests\\.testStdinMem\\.out 2>\\[DataReader\\]$", isRe=True)
 
     def testStdoutMem(self):
         # read from stdout into memory
@@ -158,7 +158,7 @@ class PipelineTests(PipettorTestBase):
         pl = Pipeline([("cat", "-u"), ("cat", "-u")], stdin=dw, stdout=dr)
         pl.wait()
         self.assertEqual(dr.data, "one\ntwo\nthree\n")
-        self.commonChecks(nopen, pl, "^cat -u <\\[DataWriter\\] \\| cat -u >\\[DataReader\\]$", isRe=True)
+        self.commonChecks(nopen, pl, "^cat -u <\\[DataWriter\\] \\| cat -u >\\[DataReader\\] 2>\\[DataReader\\]$", isRe=True)
 
     def testFileMode(self):
         with self.assertRaisesRegexp(PipettorException, "^invalid mode: 'q', expected 'r', 'w', or 'a' with optional 'b' suffix$"):
@@ -186,7 +186,7 @@ class PipelineTests(PipettorTestBase):
         pl = Pipeline(("cat",), stdin=dw, stdout=outf)
         pl.wait()
         self.diffExpected(".out", expectedBasename="file.binary")
-        self.commonChecks(nopen, pl, "^cat <\\[DataWriter] >.*/output/pipettorTests.PipelineTests.testStdinMemBinary.out$", isRe=True)
+        self.commonChecks(nopen, pl, "^cat <\\[DataWriter] >.*/output/pipettorTests.PipelineTests.testStdinMemBinary.out 2>\\[DataReader\\]$", isRe=True)
 
     def testStdoutMemBinary(self):
         # binary read from stdout into memory
@@ -199,7 +199,7 @@ class PipelineTests(PipettorTestBase):
         fh.write(dr.data)
         fh.close()
         self.diffExpected(".out", expectedBasename="file.binary")
-        self.commonChecks(nopen, pl, "^cat <.*/input/file.binary >\\[DataReader]$", isRe=True)
+        self.commonChecks(nopen, pl, "^cat <.*/input/file.binary >\\[DataReader] 2>\\[DataReader\\]$", isRe=True)
 
     def testWriteFile(self):
         # test write to File object
@@ -210,7 +210,7 @@ class PipelineTests(PipettorTestBase):
         pl = Pipeline([("cat",), ("cat",)], stdin=inf, stdout=File(outf, "w"))
         pl.wait()
         self.diffExpected(".out")
-        self.commonChecks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/pipettorTests.PipelineTests.testWriteFile.out$", isRe=True)
+        self.commonChecks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/pipettorTests.PipelineTests.testWriteFile.out 2>\\[DataReader\\]$", isRe=True)
 
     def testReadFile(self):
         # test read and write to File object
@@ -220,7 +220,7 @@ class PipelineTests(PipettorTestBase):
         pl = Pipeline([("cat",), ("cat",)], stdin=File(inf), stdout=File(outf, "w"))
         pl.wait()
         self.diffExpected(".out")
-        self.commonChecks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/pipettorTests.PipelineTests.testReadFile.out$", isRe=True)
+        self.commonChecks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/pipettorTests.PipelineTests.testReadFile.out 2>\\[DataReader\\]$", isRe=True)
 
     def testAppendFile(self):
         # test append to File object
@@ -228,9 +228,9 @@ class PipelineTests(PipettorTestBase):
         inf = self.getInputFile("simple1.txt")
         outf = self.getOutputFile(".out")
         # double cat actually found a bug
-        pl = Pipeline([("cat",), ("cat",)], stdin=inf, stdout=File(outf, "w"))
+        pl = Pipeline([("cat",), ("cat",)], stdin=inf, stdout=File(outf, "w"), stderr=None)
         pl.wait()
-        pl = Pipeline([("cat",), ("cat",)], stdin=inf, stdout=File(outf, "a"))
+        pl = Pipeline([("cat",), ("cat",)], stdin=inf, stdout=File(outf, "a"), stderr=None)
         pl.wait()
         self.diffExpected(".out")
         self.commonChecks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/pipettorTests.PipelineTests.testAppendFile.out$", isRe=True)
@@ -380,7 +380,7 @@ class PopenTests(PipettorTestBase):
         nopen = self.numOpenFiles()
         pl = Popen([("yes",), ("true",)], "r")
         pl.wait()
-        self.commonChecks(nopen, pl, "^yes | true >.+$", isRe=True)
+        self.commonChecks(nopen, pl, "^yes | true >.+ 2>\\[DataReader\\]$", isRe=True)
 
 
 class FunctionTests(PipettorTestBase):

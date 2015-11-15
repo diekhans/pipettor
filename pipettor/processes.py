@@ -311,7 +311,7 @@ class Pipeline(object):
     is provided, the contents of stderr from all process will be included in
     the exception.
     """
-    def __init__(self, cmds, stdin=None, stdout=None, stderr=None):
+    def __init__(self, cmds, stdin=None, stdout=None, stderr=DataReader):
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
@@ -377,7 +377,9 @@ class Pipeline(object):
             desc += " | " + " | ".join([str(proc) for proc in self.procs[1:]])
         if self.stdout not in (None, 1):
             desc += " >" + str(self.stdout)
-        if self.stderr not in (None, 2):
+        if self.stderr == DataReader:
+            desc += " 2>[DataReader]" # instance made in Process
+        elif self.stderr not in (None, 2):
             desc += " 2>" + str(self.stderr)
         return desc
 
