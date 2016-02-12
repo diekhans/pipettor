@@ -1,4 +1,8 @@
 #!/bin/sh
-# generates an error
-echo "THIS GOES TO STDERR" >&2
+# generates an error, include arguments if specified
+msg="THIS GOES TO STDERR"
+if [ $# -gt 0 ] ; then
+    msg="${msg}: $*"
+fi
+echo "$msg" >&2
 exit 1

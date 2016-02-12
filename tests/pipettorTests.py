@@ -41,6 +41,15 @@ class PipettorTestBase(TestCaseBase):
                 self.assertEqual(s, expectStr)
         self.orphanChecks(nopen)
 
+    def checkProgWithError(self, gotMsg, progArgs=None):
+        expectReTmpl = "^process exited 1: .+/progWithError{}{}:\nTHIS GOES TO STDERR{}{}.*$"
+        if progArgs is not None:
+            expectRe = expectReTmpl.format(" ", progArgs, ": ", progArgs)
+        else:
+            expectRe = expectReTmpl.format("", "", "", "")
+        if not re.match(expectRe, gotMsg, re.MULTILINE):
+            self.fail("'" + gotMsg + "' does not match '" + str(expectRe))
+
 
 class PipelineTests(PipettorTestBase):
     def __init__(self, methodName):
@@ -97,10 +106,24 @@ class PipelineTests(PipettorTestBase):
         pl = Pipeline([("true",), (os.path.join(self.getTestDir(), "progWithError"),), ("false",)], stderr=DataReader)
         with self.assertRaises(ProcessException) as cm:
             pl.wait()
-        msg = str(cm.exception)
-        expectRe = "^process exited 1: .+/progWithError:\nTHIS GOES TO STDERR$"
-        if not re.match(expectRe, msg, re.MULTILINE):
-            self.fail("'" + msg + "' does not match '" + str(expectRe))
+        self.checkProgWithError(str(cm.exception))
+        self.orphanChecks(nopen)
+
+    def testPipeFail3Stderr(self):
+        # all 3 process fail
+        nopen = self.numOpenFiles()
+        # should report first failure
+        pl = Pipeline([(os.path.join(self.getTestDir(), "progWithError"), "process0"),
+                       (os.path.join(self.getTestDir(), "progWithError"), "process1"),
+                       (os.path.join(self.getTestDir(), "progWithError"), "process2"),],
+                      stderr=DataReader)
+        with self.assertRaises(ProcessException) as cm:
+            pl.wait()
+        # should be first process
+        self.checkProgWithError(str(cm.exception), "process0")
+        # check process exceptinfo fields
+        for i in xrange(3):
+            self.checkProgWithError(str(pl.procs[i].exceptinfo[0]), "process{}".format(i))
         self.orphanChecks(nopen)
 
     def testExecFail(self):
@@ -305,7 +328,7 @@ class PopenTests(PipettorTestBase):
         pl = Popen(("gzip", "-1"), "w", other=outfGz)
         self.cpFileToPl("simple1.txt", pl)
         pl.close()
-        self.commonChecks(nopen, pl, "gzip -1 <.+ >.*tests/output/pipettorTests.PopenTests.testWrite.out.gz", isRe=True)
+        self.commonChecks(nopen, pl, "gzip -1 <.+ >.*output/pipettorTests.PopenTests.testWrite.out.gz", isRe=True)
 
         Pipeline(("zcat", outfGz), stdout=outf).wait()
         self.diffExpected(".out")
@@ -322,7 +345,7 @@ class PopenTests(PipettorTestBase):
 
         Pipeline(("zcat", outfGz), stdout=outf).wait()
         self.diffExpected(".out")
-        self.commonChecks(nopen, pl, "gzip -1 <.* >.*tests/output/pipettorTests.PopenTests.testWriteFile.out.gz", isRe=True)
+        self.commonChecks(nopen, pl, "gzip -1 <.* >.*output/pipettorTests.PopenTests.testWriteFile.out.gz", isRe=True)
 
     def testWriteMult(self):
         nopen = self.numOpenFiles()
@@ -337,7 +360,7 @@ class PopenTests(PipettorTestBase):
         pl.wait()
 
         self.diffExpected(".wc")
-        self.commonChecks(nopen, pl, "^gzip -1 <.+ | gzip -dc | wc | sed -e 's/  \\*/	/g' >.*tests/output/pipettorTests.PopenTests.testWriteMult.wc$", isRe=True)
+        self.commonChecks(nopen, pl, "^gzip -1 <.+ | gzip -dc | wc | sed -e 's/  \\*/	/g' >.*output/pipettorTests.PopenTests.testWriteMult.wc$", isRe=True)
 
     def testRead(self):
         nopen = self.numOpenFiles()
@@ -350,7 +373,7 @@ class PopenTests(PipettorTestBase):
         pl.wait()
 
         self.diffExpected(".out")
-        self.commonChecks(nopen, pl, "^gzip -dc <.*tests/output/pipettorTests.PopenTests.testRead.txt.gz >.+$", isRe=True)
+        self.commonChecks(nopen, pl, "^gzip -dc <.*output/pipettorTests.PopenTests.testRead.txt.gz >.+$", isRe=True)
 
     def testReadMult(self):
         nopen = self.numOpenFiles()
@@ -416,10 +439,7 @@ class FunctionTests(PipettorTestBase):
         inf = self.getInputFile("simple1.txt")
         with self.assertRaises(ProcessException) as cm:
             call_output([("sort", "-r"), (os.path.join(self.getTestDir(), "progWithError"),), ("false",)], stdin=inf)
-        msg = str(cm.exception)
-        expectRe = """^process exited 1: .+/progWithError:\nTHIS GOES TO STDERR$"""
-        if not re.match(expectRe, msg, re.MULTILINE):
-            self.fail("'" + msg + "' does not match '" + str(expectRe))
+        self.checkProgWithError(str(cm.exception));
         self.orphanChecks(nopen)
 
 
