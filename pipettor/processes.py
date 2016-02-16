@@ -379,7 +379,7 @@ class Pipeline(object):
         if self.stdout not in (None, 1):
             desc += " >" + str(self.stdout)
         if self.stderr == DataReader:
-            desc += " 2>[DataReader]" # instance made in Process
+            desc += " 2>[DataReader]"  # instance made in Process
         elif self.stderr not in (None, 2):
             desc += " 2>" + str(self.stderr)
         return desc
@@ -554,10 +554,10 @@ class Popen(Pipeline):
         _validate_mode(mode, allow_append=False)
         if mode == "r":
             if stdout is not None:
-                raise  PipettorException("can not specify stdout with read mode")
+                raise PipettorException("can not specify stdout with read mode")
         else:
             if stdin is not None:
-                raise  PipettorException("can not specify stdin with write mode")
+                raise PipettorException("can not specify stdin with write mode")
 
         pipe_read_fd, pipe_write_fd = os.pipe()
         if mode == "r":

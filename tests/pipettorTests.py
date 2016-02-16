@@ -115,7 +115,7 @@ class PipelineTests(PipettorTestBase):
         # should report first failure
         pl = Pipeline([(os.path.join(self.getTestDir(), "progWithError"), "process0"),
                        (os.path.join(self.getTestDir(), "progWithError"), "process1"),
-                       (os.path.join(self.getTestDir(), "progWithError"), "process2"),],
+                       (os.path.join(self.getTestDir(), "progWithError"), "process2")],
                       stderr=DataReader)
         with self.assertRaises(ProcessException) as cm:
             pl.wait()
@@ -439,7 +439,7 @@ class FunctionTests(PipettorTestBase):
         inf = self.getInputFile("simple1.txt")
         with self.assertRaises(ProcessException) as cm:
             runout([("sort", "-r"), (os.path.join(self.getTestDir(), "progWithError"),), ("false",)], stdin=inf)
-        self.checkProgWithError(str(cm.exception));
+        self.checkProgWithError(str(cm.exception))
         self.orphanChecks(nopen)
 
 
