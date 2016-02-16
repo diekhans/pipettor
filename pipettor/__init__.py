@@ -24,10 +24,10 @@ def run(cmds, stdin=None, stdout=None, stderr=DataReader):
     without the danger of deadlock.
 
     If stderr is the class DataReader, a new instance is created for each
-    process in the pipeline. The contents of stderr will include an
-    exception if an occurs in that process.  If an instance of DataReader
-    is provided, the contents of stderr from all process will be included in
-    the exception.
+    process in the pipeline. The contents of stderr will include an exception
+    if an occurs in that process.  If an instance of
+    :class:`pipettor.DataReader` is provided, the contents of stderr from all
+    process will be included in the exception.
     """
     Pipeline(cmds, stdin=stdin, stdout=stdout, stderr=stderr).wait()
 
@@ -37,7 +37,8 @@ def runout(cmds, stdin=None, stderr=DataReader):
     Construct and run an process pipeline, returning the output. If any of the
     processes fail, a ProcessException is throw.
 
-    See the call() function for more details.
+    See the :func:`pipettor.call` function for more details.  Use
+    `str.splitlines()` to split result into lines.
     """
     dr = DataReader()
     Pipeline(cmds, stdin=stdin, stdout=dr, stderr=stderr).wait()
