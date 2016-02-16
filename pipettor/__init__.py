@@ -6,10 +6,10 @@ from pipettor.exceptions import PipettorException, ProcessException
 from pipettor.devices import Dev, DataReader, DataWriter, File
 from pipettor.processes import Pipeline, Popen
 
-__version__ = "0.1a"
+__version__ = "0.1a1"
 
 
-def call(cmds, stdin=None, stdout=None, stderr=DataReader):
+def run(cmds, stdin=None, stdout=None, stderr=DataReader):
     """
     Construct and run an process pipeline. If any of the processes fail,
     a ProcessException is throw.
@@ -32,7 +32,7 @@ def call(cmds, stdin=None, stdout=None, stderr=DataReader):
     Pipeline(cmds, stdin=stdin, stdout=stdout, stderr=stderr).wait()
 
 
-def call_output(cmds, stdin=None, stderr=DataReader):
+def runout(cmds, stdin=None, stderr=DataReader):
     """
     Construct and run an process pipeline, returning the output. If any of the
     processes fail, a ProcessException is throw.
@@ -47,4 +47,4 @@ def call_output(cmds, stdin=None, stderr=DataReader):
 __all__ = (PipettorException.__name__, ProcessException.__name__,
            Dev.__name__, DataReader.__name__, DataWriter.__name__,
            File.__name__, Pipeline.__name__, Popen.__name__,
-           call.__name__,)
+           run.__name__, runout.__name__,)

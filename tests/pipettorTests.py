@@ -7,7 +7,7 @@ import re
 import signal
 if __name__ == '__main__':
     sys.path.insert(0, os.path.normpath(os.path.dirname(sys.argv[0])) + "/..")
-from pipettor import Pipeline, Popen, ProcessException, PipettorException, DataReader, DataWriter, File, call, call_output
+from pipettor import Pipeline, Popen, ProcessException, PipettorException, DataReader, DataWriter, File, run, runout
 from testCaseBase import TestCaseBase
 
 # this keeps OS/X crash reporter from popping up on unittest error
@@ -415,21 +415,21 @@ class FunctionTests(PipettorTestBase):
         nopen = self.numOpenFiles()
         inf = self.getInputFile("simple1.txt")
         outf = self.getOutputFile(".out")
-        call([("cat",), ("cat",)], stdin=inf, stdout=File(outf, "w"))
+        run([("cat",), ("cat",)], stdin=inf, stdout=File(outf, "w"))
         self.diffExpected(".out")
         self.orphanChecks(nopen)
 
     def testSimplePipeFail(self):
         nopen = self.numOpenFiles()
         with self.assertRaisesRegexp(ProcessException, "^process exited 1: false$"):
-            call([("false",), ("true",)])
+            run([("false",), ("true",)])
         self.orphanChecks(nopen)
 
     def testStdoutRead(self):
         # read from stdout into memory
         nopen = self.numOpenFiles()
         inf = self.getInputFile("simple1.txt")
-        out = call_output(("sort", "-r"), stdin=inf)
+        out = runout(("sort", "-r"), stdin=inf)
         self.assertEqual(out, "two\nthree\nsix\none\nfour\nfive\n")
         self.orphanChecks(nopen)
 
@@ -438,7 +438,7 @@ class FunctionTests(PipettorTestBase):
         nopen = self.numOpenFiles()
         inf = self.getInputFile("simple1.txt")
         with self.assertRaises(ProcessException) as cm:
-            call_output([("sort", "-r"), (os.path.join(self.getTestDir(), "progWithError"),), ("false",)], stdin=inf)
+            runout([("sort", "-r"), (os.path.join(self.getTestDir(), "progWithError"),), ("false",)], stdin=inf)
         self.checkProgWithError(str(cm.exception));
         self.orphanChecks(nopen)
 
