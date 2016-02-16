@@ -67,6 +67,7 @@ class Process(object):
         self.pgid = None
         self.status_pipe = None
         self.returncode = None  # exit code, or -signal
+        # FIXME: should this just be exception for the users??
         self.exceptinfo = None  # (exception, value, traceback)
         self.started = False
         self.finished = False
@@ -531,35 +532,42 @@ class Popen(Pipeline):
     .. automethod:: __init__
     """
 
-    def __init__(self, cmds, mode='r', other=None):
+    def __init__(self, cmds, mode='r', stdin=None, stdout=None):
         """cmds is either a list of arguments for a single process, or a list of such
         lists for a pipeline.  Mode is 'r' for a pipeline who's output will be
         read, or 'w' for a pipeline to that is to have data written to it.  If
-        other is specified, and is a string, it is a file to open as other
+        stdin or stdout is specified, and is a string, it is a file to open as other
         file at the other end of the pipeline.  If it's not a string, it is
-        assumed to be a file object to use for output.
+        assumed to be a file object to use for input or output.  For a read pipe,
+        only stdin can be specified, for a write pipe, only stdout can be used.
 
         read pipeline ('r'):
-          other --> cmd[0] --> ... --> cmd[n] --> Popen
+          stdin --> cmd[0] --> ... --> cmd[n] --> Popen
 
         write pipeline ('w')
-          Popen --> cmd[0] --> ... --> cmd[n] --> other
+          Popen --> cmd[0] --> ... --> cmd[n] --> stdout
 
         """
-        _validate_mode(mode, allow_append=False)
         self.mode = mode
         self.__parent_fh = None
         self.__child_fd = None
+        _validate_mode(mode, allow_append=False)
+        if mode == "r":
+            if stdout is not None:
+                raise  PipettorException("can not specify stdout with read mode")
+        else:
+            if stdin is not None:
+                raise  PipettorException("can not specify stdin with write mode")
 
         pipe_read_fd, pipe_write_fd = os.pipe()
         if mode == "r":
-            firstIn = other
+            firstIn = stdin
             lastOut = pipe_write_fd
             self.__child_fd = pipe_write_fd
             self.__parent_fh = os.fdopen(pipe_read_fd, mode)
         else:
             firstIn = pipe_read_fd
-            lastOut = other
+            lastOut = stdout
             self.__child_fd = pipe_read_fd
             self.__parent_fh = os.fdopen(pipe_write_fd, mode)
         super(Popen, self).__init__(cmds, stdin=firstIn, stdout=lastOut)

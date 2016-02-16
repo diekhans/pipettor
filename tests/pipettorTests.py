@@ -325,7 +325,7 @@ class PopenTests(PipettorTestBase):
         outf = self.getOutputFile(".out")
         outfGz = self.getOutputFile(".out.gz")
 
-        pl = Popen(("gzip", "-1"), "w", other=outfGz)
+        pl = Popen(("gzip", "-1"), "w", stdout=outfGz)
         self.cpFileToPl("simple1.txt", pl)
         pl.close()
         self.commonChecks(nopen, pl, "gzip -1 <.+ >.*output/pipettorTests.PopenTests.testWrite.out.gz", isRe=True)
@@ -339,7 +339,7 @@ class PopenTests(PipettorTestBase):
         outfGz = self.getOutputFile(".out.gz")
 
         with open(outfGz, "w") as outfGzFh:
-            pl = Popen(("gzip", "-1"), "w", other=outfGzFh)
+            pl = Popen(("gzip", "-1"), "w", stdout=outfGzFh)
             self.cpFileToPl("simple1.txt", pl)
             pl.wait()
 
@@ -355,7 +355,7 @@ class PopenTests(PipettorTestBase):
         pl = Popen((("gzip", "-1"),
                     ("gzip", "-dc"),
                     ("wc",),
-                    ("sed", "-e", "s/  */\t/g")), "w", other=outf)
+                    ("sed", "-e", "s/  */\t/g")), "w", stdout=outf)
         self.cpFileToPl("simple1.txt", pl)
         pl.wait()
 
@@ -368,7 +368,7 @@ class PopenTests(PipettorTestBase):
         infGz = self.getOutputFile(".txt.gz")
         Pipeline(("gzip", "-c", inf), stdout=infGz).wait()
 
-        pl = Popen(("gzip", "-dc"), "r", other=infGz)
+        pl = Popen(("gzip", "-dc"), "r", stdin=infGz)
         self.cpPlToFile(pl, ".out")
         pl.wait()
 
@@ -382,7 +382,7 @@ class PopenTests(PipettorTestBase):
         pl = Popen((("gzip", "-1c"),
                     ("gzip", "-dc"),
                     ("wc",),
-                    ("sed", "-e", "s/  */\t/g")), "r", other=inf)
+                    ("sed", "-e", "s/  */\t/g")), "r", stdin=inf)
         self.cpPlToFile(pl, ".wc")
         pl.wait()
 
