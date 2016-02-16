@@ -24,6 +24,7 @@ help:
 	@echo "release - package and upload a release"
 	@echo "dist - package"
 	@echo "install - install the package to the active Python's site-packages"
+	@echo "testpip - test install the package using pip"
 
 clean: clean-build clean-pyc clean-test
 
@@ -31,6 +32,7 @@ clean-build:
 	rm -fr build/
 	rm -fr dist/
 	rm -fr .eggs/
+	rm -rf tmp
 	find . -name '*.egg-info' -exec rm -fr {} +
 	find . -name '*.egg' -exec rm -f {} +
 
@@ -82,3 +84,11 @@ dist: clean
 
 install: clean
 	python setup.py install
+
+testenv = tmp/testemv
+testpip: dist
+	@rm -rf ${testenv}
+	mkdir -p ${testenv}
+	virtualenv ${testenv}
+	(cd ${testenv} && source ./bin/activate && pip install --no-cache-dir ../../dist/pipettor-*.tar.gz)
+	(cd ${testenv} && source ./bin/activate && python ../../tests/pipettorTests.py)

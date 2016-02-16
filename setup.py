@@ -33,8 +33,8 @@ setup(
     packages=[
         'pipettor',
     ],
-    package_dir={'pipettor':
-                 'pipettor'},
+    package_dir={'':
+                 'src'},
     include_package_data=True,
     install_requires=requirements,
     license="MIT",
