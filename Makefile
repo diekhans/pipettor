@@ -48,7 +48,7 @@ clean-test:
 	rm -fr htmlcov/
 
 lint:
-	flake8 pipettor tests
+	flake8 src/pipettor tests
 
 test:
 	python setup.py test
