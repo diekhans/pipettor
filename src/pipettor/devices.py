@@ -42,6 +42,13 @@ class Dev(object):
         """associate write side with child process."""
         pass
 
+    def _bind_to_process(self, process, mode):
+        """associate with a child process based on mode"""
+        if mode.startswith("r"):
+            self._bind_read_to_process(process)
+        else:
+            self._bind_write_to_process(process)
+
     def _post_fork_parent(self):
         """post-fork parent setup."""
         pass

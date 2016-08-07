@@ -86,17 +86,14 @@ class Process(object):
         if (spec is None) or isinstance(spec, int):
             return spec  # passed unchanged
         elif isinstance(spec, Dev):
-            if mode.startswith("r"):
-                spec._bind_read_to_process(self)
-            else:
-                spec._bind_write_to_process(self)
+            spec._bind_to_process(self, mode)
             return spec  # passed unchanged
         elif callable(getattr(spec, "fileno", None)):
             return spec.fileno()  # is file-like
         elif isinstance(spec, str) or isinstance(spec, unicode):
             return File(spec, mode)
         else:
-            raise PipettorException("invalid stdio specification object type: " + str(type(spec)) + " " + str(spec))
+            raise PipettorException("invalid stdio specification object type: {} {}".format(type(spec), spec))
 
     def __child_stdio_setup(self, spec, stdfd):
         """post-fork setup one of the stdio fds."""
@@ -106,13 +103,10 @@ class Process(object):
         elif isinstance(spec, int):
             fd = spec
         elif isinstance(spec, Dev):
-            if stdfd == 0:   # stdin?
-                fd = spec.read_fd
-            else:
-                fd = spec.write_fd
+            fd = spec.read_fd if stdfd == 0 else spec.write_fd
         if fd is None:
             # this should have been detected before forking
-            raise PipettorException("__child_stdio_setup logic error: %s %s" % (str(type(spec)), stdfd))
+            raise PipettorException("__child_stdio_setup logic error: {} {}".format(type(spec), stdfd))
         # dup to target descriptor if not already there
         if fd != stdfd:
             os.dup2(fd, stdfd)
@@ -189,7 +183,7 @@ class Process(object):
         elif isinstance(status, Exception):
             raise status
         else:
-            raise PipettorException("expected _SetpgidCompleteMsg message, got " + str(status))
+            raise PipettorException("expected _SetpgidCompleteMsg message, got {}".format(status))
 
     def __parent_start(self):
         "start in parent process"
@@ -348,8 +342,7 @@ class Pipeline(object):
             outPipe = None
             stdout = stdoutLast  # last process in pipeline
         else:
-            outPipe = _SiblingPipe()
-            stdout = outPipe
+            outPipe = stdout = _SiblingPipe()
         try:
             self.__create_process(cmd, stdin, stdout, stderr)
         except:

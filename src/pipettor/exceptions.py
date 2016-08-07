@@ -49,6 +49,16 @@ class PipettorException(Exception):
         return PipettorException.formatExcept(self)
 
     @staticmethod
+    def __formatStackTrace(stackTrace, doneStacks=None):
+        """return stack trace description to include in error message."""
+        desc = []
+        for s in stackTrace:
+            if s not in doneStacks:
+                desc.append[s]
+                doneStacks.add(s)
+        return "".join(desc)
+
+    @staticmethod
     def formatExcept(ex, doneStacks=None):
         """Format any type of exception, handling PipettorException objects and
         stackTrace added to standard Exceptions."""
@@ -58,14 +68,11 @@ class PipettorException(Exception):
             desc += ex.msg + "\n"
         else:
             desc += str(ex) + "\n"
-        st = getattr(ex, "stackTrace", None)
-        if st is not None:
+        stackTrace = getattr(ex, "stackTrace", None)
+        if stackTrace is not None:
             if doneStacks is None:
                 doneStacks = set()
-            for s in st:
-                if s not in doneStacks:
-                    desc += s
-                    doneStacks.add(s)
+            desc += PipettorException.__formatStackTrace(stackTrace, doneStacks)
         ca = getattr(ex, "cause", None)
         if ca is not None:
             desc += "caused by: " + PipettorException.formatExcept(ca, doneStacks)
