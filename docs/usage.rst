@@ -6,9 +6,9 @@ Usage
 
 A single processes in pipettor are specified as sequence (list or tuple) of
 the command and its arguments.  A process pipeline is specified as a sequence
-of such commands.  Functions to create processes check if a specified
-command is a sequence of commands or a single command based on the sequence
-structure.
+of such commands (lists of lists, lists of tuples, etc).
+Functions to create processes check if a specified command is a sequence of
+commands or a single command based on the sequence structure.
 
 Examples commands are::
 
@@ -27,14 +27,31 @@ The simplest way to execute a pipeline synchronously is to use
 the :func:`pipettor.run` or :func:`pipettor.runout` functions::
 
     import pipettor
-    pipettor.run([("sort", "-u", "/etc/stuff"), ("wc", "-l")], stdout="stuff.linecnt")
-    out = pipettor.runout([("sort", "-u", "/etc/stuff"), ("wc", "-l")])
+    pipettor.run([("sort", "-u", "/etc/hosts"), ("wc", "-l")], stdout="hosts.linecnt")
+    out = pipettor.runout([("sort", "-u", "/etc/hosts"), ("wc", "-l")])
 
     
 File line objects to or from a file maybe create using the
 :class:`pipettor.Popen` class::
 
     import pipettor
-    rfh = pipettor.Popen([("sort", "-u", "/etc/stuff"), ("wc", "-l")])
+    rfh = pipettor.Popen([("sort", "-u", "/etc/hosts"), ("wc", "-l")])
     wfh = pipettor.Popen([("sort", "-u"), ("wc", "-l")], "w", stdout="uniq.linecnt")
          
+Data can be written to pipelines using :class:`pipettor.DataWriter` objects::
+
+    import pipettor
+    dw = pipettor.DataWriter("line3\nline1\nline2\nline1\n")
+    pipettor.run([("sort", "-u",), ("wc", "-l")], stdin=dw, stdout="writer.linecnt")
+
+
+Data can be written to pipelines using :class:`pipettor.DataWriter` objects::
+
+    import pipettor
+    dr = pipettor.DataReader()
+    pipettor.run([("sort", "-u", "/etc/hosts"), ("wc", "-l")], stdout=dr)
+    print dr.data
+
+
+Full control of process pipelines can be achieved using :class:`pipettor.Pipeline`
+class directly.

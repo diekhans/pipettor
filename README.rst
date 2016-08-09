@@ -2,7 +2,7 @@
 pipettor
 ===============================
 
-pipettor - robust, easy to use Unix process pipelines
+pipettor - robust, easy to use Python package for running Unix process pipelines
 
 Features
 --------

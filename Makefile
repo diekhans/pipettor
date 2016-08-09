@@ -1,4 +1,4 @@
-.PHONY: clean-pyc clean-build docs clean
+.PHONY: help clean clean-build clean-pyc clean-docs clean-tests lint test test-all coverage docs servedocs release dist install testpip
 define BROWSER_PYSCRIPT
 import os, webbrowser, sys
 try:
@@ -10,6 +10,9 @@ webbrowser.open("file://" + pathname2url(os.path.abspath(sys.argv[1])))
 endef
 export BROWSER_PYSCRIPT
 BROWSER := python -c "$$BROWSER_PYSCRIPT"
+
+testenv = testenv
+
 
 help:
 	@echo "clean - remove all build, test, coverage and Python artifacts"
@@ -26,13 +29,13 @@ help:
 	@echo "install - install the package to the active Python's site-packages"
 	@echo "testpip - test install the package using pip"
 
-clean: clean-build clean-pyc clean-test
+clean: clean-build clean-pyc clean-test clean-docs
 
 clean-build:
 	rm -fr build/
 	rm -fr dist/
 	rm -fr .eggs/
-	rm -rf tmp
+	rm -fr ${testenv}/
 	find . -name '*.egg-info' -exec rm -fr {} +
 	find . -name '*.egg' -exec rm -f {} +
 
@@ -41,6 +44,9 @@ clean-pyc:
 	find . -name '*.pyo' -exec rm -f {} +
 	find . -name '*~' -exec rm -f {} +
 	find . -name '__pycache__' -exec rm -fr {} +
+
+clean-docs:
+	$(MAKE) -C docs clean
 
 clean-test:
 	rm -fr .tox/
@@ -65,7 +71,7 @@ coverage:
 docs:
 	rm -f docs/pipettor.rst
 	rm -f docs/modules.rst
-	sphinx-apidoc -o docs/ pipettor
+	sphinx-apidoc -o docs/ src
 	$(MAKE) -C docs clean
 	$(MAKE) -C docs html
 	$(BROWSER) docs/_build/html/index.html
@@ -85,7 +91,6 @@ dist: clean
 install: clean
 	python setup.py install
 
-testenv = tmp/testemv
 testpip: dist
 	@rm -rf ${testenv}
 	mkdir -p ${testenv}

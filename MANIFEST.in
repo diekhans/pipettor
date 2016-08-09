@@ -4,7 +4,7 @@ include HISTORY.rst
 include LICENSE
 include README.rst
 
-recursive-include pipettor *.py
+recursive-include src *.py
 recursive-include tests *
 recursive-exclude tests output/*
 recursive-exclude * *.py[co]
