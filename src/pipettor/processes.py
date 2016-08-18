@@ -19,20 +19,18 @@ from pipettor.exceptions import ProcessException
 from pipettor.exceptions import _warn_error_during_error_handling
 
 
-# Why better that subprocess:
-#   - natural pipeline
-#   - stderr thrown as excpetion
+# FIXME: C-c problems:
+# http://code.activestate.com/recipes/496735-workaround-for-missed-sigint-in-multithreaded-prog/
+# http://bugs.python.org/issue21822
 
 try:
     MAXFD = os.sysconf("SC_OPEN_MAX")
 except:
     MAXFD = 256
 
-
 class _SetpgidCompleteMsg(object):
     "message sent to by first process to indicate that setpgid is complete"
     pass
-
 
 class Process(object):
     """A process, represented as a node a pipeline Proc objects, connected by
@@ -124,7 +122,6 @@ class Process(object):
                 pass
 
     def __child_set_signals(self):
-        # FIXME: might want to reset other signals
         signal.signal(signal.SIGPIPE, signal.SIG_DFL)  # ensure terminate on pipe close
 
     def __child_setup_devices(self):
@@ -197,7 +194,17 @@ class Process(object):
         self.pgid = pgid
         self.status_pipe = _StatusPipe()
         self.started = True  # do first to prevent restarts on error
-        self.pid = os.fork()
+
+        # From subprocess.py: Disable gc to avoid bug where gc -> file_dealloc ->
+        # write to stderr -> hang.  http://bugs.python.org/issue1336
+        gc_was_enabled = gc.isenabled()
+        gc.disable()
+        try:
+            self.pid = os.fork()
+        except:
+            if gc_was_enabled:
+                gc.enable()
+            raise
         if self.pid == 0:
             self.__child_start()
         else:

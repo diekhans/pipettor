@@ -46,6 +46,8 @@ clean-pyc:
 	find . -name '__pycache__' -exec rm -fr {} +
 
 clean-docs:
+	rm -f docs/pipettor.rst
+	rm -f docs/modules.rst
 	$(MAKE) -C docs clean
 
 clean-test:
