@@ -6,6 +6,7 @@ from __future__ import print_function
 import os
 import sys
 import signal
+import gc
 import errno
 import pipes
 from pipettor.devices import _validate_mode
