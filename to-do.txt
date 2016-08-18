@@ -1,6 +1,0 @@
-
-- C-c hangs related to thread join()
-  http://code.activestate.com/recipes/496735-workaround-for-missed-sigint-in-multithreaded-prog/
-  http://bugs.python.org/issue21822
-  - this can be reproduced by start child write Popen, then parent throwing an exception
-
