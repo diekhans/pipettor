@@ -38,14 +38,14 @@ File line objects to or from a file maybe create using the
     rfh = pipettor.Popen([("sort", "-u", "/etc/hosts"), ("wc", "-l")])
     wfh = pipettor.Popen([("sort", "-u"), ("wc", "-l")], "w", stdout="uniq.linecnt")
          
-Data can be written to pipelines using :class:`pipettor.DataWriter` objects::
+Data can be also be written to pipelines using :class:`pipettor.DataWriter` objects::
 
     import pipettor
     dw = pipettor.DataWriter("line3\nline1\nline2\nline1\n")
     pipettor.run([("sort", "-u",), ("wc", "-l")], stdin=dw, stdout="writer.linecnt")
 
 
-Data can be written to pipelines using :class:`pipettor.DataWriter` objects::
+Data can be read from pipelines using :class:`pipettor.DataReader` objects::
 
     import pipettor
     dr = pipettor.DataReader()
@@ -54,4 +54,6 @@ Data can be written to pipelines using :class:`pipettor.DataWriter` objects::
 
 
 Full control of process pipelines can be achieved using :class:`pipettor.Pipeline`
-class directly.
+class directly.  The  :class:`pipettor.DataReader` and :class:`pipettor.DataWriter`
+object create threads, allowing for both reading and writing to a process without
+risk of deadlocking.

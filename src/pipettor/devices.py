@@ -12,6 +12,18 @@ import pickle
 from pipettor.exceptions import PipettorException
 
 
+# note:
+# A problem with python threads and signal handling is that SIGINT (C-c) will
+# not raise an exception if it's blocked in thread join.  If the thread never
+# terminates, the process hangs, not responding to SIGINT.  This can happen if
+# the forked process is hung.  to work around this, setting the I/O threads to
+# daemon solves the problem.  It also cause the process to to wait if the main
+# process exists and close hasn't been called.
+#
+#  http://bugs.python.org/issue21822
+#  http://code.activestate.com/recipes/496735-workaround-for-missed-sigint-in-multithreaded-prog/
+
+
 _rwa_re = re.compile("^[rwa]b?$")
 _rw_re = re.compile("^[rw]b?$")
 
@@ -104,6 +116,7 @@ class DataReader(Dev):
     def _post_exec_parent(self):
         "called to do any post-exec handling in the parent"
         self.__thread = threading.Thread(target=self.__reader)
+        self.__thread.daemon = True  # see note at top of this file
         self.__thread.start()
 
     def close(self):
@@ -169,6 +182,7 @@ class DataWriter(Dev):
     def _post_exec_parent(self):
         "called to do any post-exec handling in the parent"
         self.__thread = threading.Thread(target=self.__writer)
+        self.__thread.daemon = True  # see note at top of this file
         self.__thread.start()
 
     def close(self):
