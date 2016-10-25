@@ -7,7 +7,7 @@ import re
 import signal
 if __name__ == '__main__':
     sys.path.insert(0, os.path.normpath(os.path.dirname(sys.argv[0])) + "/../src")
-from pipettor import Pipeline, Popen, ProcessException, PipettorException, DataReader, DataWriter, File, run, runout
+from pipettor import Pipeline, Popen, ProcessException, PipettorException, DataReader, DataWriter, File, run, runout, runlex, runlexout
 from testCaseBase import TestCaseBase
 
 # this keeps OS/X crash reporter from popping up on unittest error
@@ -440,6 +440,23 @@ class FunctionTests(PipettorTestBase):
         with self.assertRaises(ProcessException) as cm:
             runout([("sort", "-r"), (os.path.join(self.getTestDir(), "progWithError"),), ("false",)], stdin=inf)
         self.checkProgWithError(str(cm.exception))
+        self.orphanChecks(nopen)
+
+    def testWriteFileLex(self):
+        # test write to File object
+        nopen = self.numOpenFiles()
+        inf = self.getInputFile("simple1.txt")
+        outf = self.getOutputFile(".out")
+        runlex(["cat -u", ["cat", "-u"], "cat -n"], stdin=inf, stdout=File(outf, "w"))
+        self.diffExpected(".out")
+        self.orphanChecks(nopen)
+
+    def testStdoutReadLex(self):
+        # read from stdout into memory
+        nopen = self.numOpenFiles()
+        inf = self.getInputFile("simple1.txt")
+        out = runlexout("sort -r", stdin=inf)
+        self.assertEqual(out, "two\nthree\nsix\none\nfour\nfive\n")
         self.orphanChecks(nopen)
 
 

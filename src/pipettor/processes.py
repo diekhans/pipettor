@@ -29,9 +29,11 @@ try:
 except:
     MAXFD = 256
 
+
 class _SetpgidCompleteMsg(object):
     "message sent to by first process to indicate that setpgid is complete"
     pass
+
 
 class Process(object):
     """A process, represented as a node a pipeline Proc objects, connected by

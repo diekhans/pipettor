@@ -52,6 +52,12 @@ Data can be read from pipelines using :class:`pipettor.DataReader` objects::
     pipettor.run([("sort", "-u", "/etc/hosts"), ("wc", "-l")], stdout=dr)
     print dr.data
 
+The :func:`pipettor.runlex` or :func:`pipettor.runlexout` functions pass string arguments
+through `shlex.split` to split them into arguments::
+
+    import pipettor
+    out = pipettor.runlexout("sort -u /etc/hosts")
+    out = pipettor.runlexout(["sort -u /etc/hosts", ("wc", "-l")])
 
 Full control of process pipelines can be achieved using :class:`pipettor.Pipeline`
 class directly.  The  :class:`pipettor.DataReader` and :class:`pipettor.DataWriter`

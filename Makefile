@@ -97,5 +97,5 @@ testpip: dist
 	@rm -rf ${testenv}
 	mkdir -p ${testenv}
 	virtualenv ${testenv}
-	(cd ${testenv} && source ./bin/activate && pip install --no-cache-dir ../../dist/pipettor-*.tar.gz)
-	(cd ${testenv} && source ./bin/activate && python ../../tests/pipettorTests.py)
+	(cd ${testenv} && source ./bin/activate && pip install --no-cache-dir ../dist/pipettor-*.tar.gz)
+	(cd ${testenv} && source ./bin/activate && python ../tests/pipettorTests.py)
