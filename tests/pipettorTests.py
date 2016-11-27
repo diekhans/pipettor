@@ -8,7 +8,7 @@ import signal
 if __name__ == '__main__':
     sys.path.insert(0, os.path.normpath(os.path.dirname(sys.argv[0])) + "/../src")
 from pipettor import Pipeline, Popen, ProcessException, PipettorException, DataReader, DataWriter, File, run, runout, runlex, runlexout
-from testCaseBase import TestCaseBase
+from testCaseBase import TestCaseBase, TestLogging
 
 # this keeps OS/X crash reporter from popping up on unittest error
 signal.signal(signal.SIGQUIT,
@@ -89,16 +89,22 @@ class PipelineTests(PipettorTestBase):
 
     def testSimplePipe(self):
         nopen = self.numOpenFiles()
-        pl = Pipeline([("true",), ("true",)])
+        log = TestLogging()
+        pl = Pipeline([("true",), ("true",)], logger=log.logger)
         pl.wait()
         self.commonChecks(nopen, pl, "true | true 2>[DataReader]")
+        self.assertEqual(log.data, """start: true | true 2>[DataReader]\n"""
+                         """success: true | true 2>[DataReader]\n""")
 
     def testSimplePipeFail(self):
         nopen = self.numOpenFiles()
-        pl = Pipeline([("false",), ("true",)])
+        log = TestLogging()
+        pl = Pipeline([("false",), ("true",)], logger=log.logger)
         with self.assertRaisesRegexp(ProcessException, "^process exited 1: false$"):
             pl.wait()
         self.commonChecks(nopen, pl, "false | true 2>[DataReader]")
+        self.assertEqual(log.data, """start: false | true 2>[DataReader]\n"""
+                         """failure: false | true 2>[DataReader]: process exited 1: false\n""")
 
     def testPipeFailStderr(self):
         nopen = self.numOpenFiles()

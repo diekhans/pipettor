@@ -8,6 +8,8 @@ import threading
 import errno
 import re
 import glob
+import logging
+import StringIO
 
 try:
     MAXFD = os.sysconf("SC_OPEN_MAX")
@@ -47,6 +49,19 @@ def ensureFileDir(fname):
         return "."
 
 
+class TestLogging():
+    """test logger that logs to memory, each instance has a new logger"""
+    def __init__(self, level=logging.DEBUG):
+        self.logger = logging.getLogger(str(id(self)))
+        self.logger.setLevel(level)
+        self.__buffer = StringIO.StringIO()
+        self.logger.addHandler(logging.StreamHandler(self.__buffer))
+
+    @property
+    def data(self):
+        return self.__buffer.getvalue()
+
+
 class TestCaseBase(unittest.TestCase):
     """Base class for test case with various test support functions"""
 
@@ -55,7 +70,7 @@ class TestCaseBase(unittest.TestCase):
         super(TestCaseBase, self).__init__(methodName=methodName)
         clId = self.getClassId()
         od = self.getOutputDir()
-        for f in glob.glob(od + "/" + clId + ".*") + glob.glob(od + "/tmp.*." + clId + ".*"):
+        for f in glob.glob("{}/{}.*".format(od, clId)) + glob.glob("{}/tmp.*{}.*".format(od, clId)):
             rmTree(f)
 
     def getClassId(self):

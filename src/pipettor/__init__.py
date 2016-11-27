@@ -5,12 +5,12 @@ from __future__ import print_function
 import shlex
 from pipettor.exceptions import PipettorException, ProcessException
 from pipettor.devices import Dev, DataReader, DataWriter, File
-from pipettor.processes import Pipeline, Popen
+from pipettor.processes import Pipeline, Popen, setDefaultLogger, getDefaultLogger, setDefaultLogLevel, getDefaultLogLevel
 
 __version__ = "0.1a1"
 
 
-def run(cmds, stdin=None, stdout=None, stderr=DataReader):
+def run(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLevel=None):
     """Construct and run an process pipeline. If any of the processes fail,
     a ProcessException is throw.
 
@@ -34,7 +34,7 @@ def run(cmds, stdin=None, stdout=None, stderr=DataReader):
     Pipeline(cmds, stdin=stdin, stdout=stdout, stderr=stderr).wait()
 
 
-def runout(cmds, stdin=None, stderr=DataReader):
+def runout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None):
     """
     Construct and run an process pipeline, returning the output. If any of the
     processes fail, a ProcessException is throw.
@@ -43,7 +43,7 @@ def runout(cmds, stdin=None, stderr=DataReader):
     `str.splitlines()` to split result into lines.
     """
     dr = DataReader()
-    Pipeline(cmds, stdin=stdin, stdout=dr, stderr=stderr).wait()
+    Pipeline(cmds, stdin=stdin, stdout=dr, stderr=stderr, logger=logger, logLevel=logLevel).wait()
     return dr.data
 
 
@@ -59,7 +59,7 @@ def _lexcmds(cmds):
         return [shlex.split(cmd) if _isstr(cmd) else cmd for cmd in cmds]
 
 
-def runlex(cmds, stdin=None, stdout=None, stderr=DataReader):
+def runlex(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLevel=None):
     """
     Call :func:`pipettor.run`, first splitting commands specified
     as strings are split into arguments using `shlex.split`.
@@ -73,7 +73,7 @@ def runlex(cmds, stdin=None, stdout=None, stderr=DataReader):
     run(_lexcmds(cmds), stdin=stdin, stdout=stdout, stderr=stderr)
 
 
-def runlexout(cmds, stdin=None, stderr=DataReader):
+def runlexout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None):
     """
     Call :func:`pipettor.runout`, first splitting commands specified
     as strings are split into arguments using `shlex.split`.
@@ -90,4 +90,6 @@ def runlexout(cmds, stdin=None, stderr=DataReader):
 __all__ = (PipettorException.__name__, ProcessException.__name__,
            Dev.__name__, DataReader.__name__, DataWriter.__name__,
            File.__name__, Pipeline.__name__, Popen.__name__,
+           setDefaultLogger.__name__, getDefaultLogger.__name__,
+           setDefaultLogLevel.__name__, getDefaultLogLevel.__name__,
            run.__name__, runout.__name__, runlex.__name__, runlexout.__name__,)

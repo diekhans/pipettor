@@ -9,6 +9,7 @@ import signal
 import gc
 import errno
 import pipes
+import logging
 from pipettor.devices import _validate_mode
 from pipettor.devices import Dev
 from pipettor.devices import DataReader
@@ -33,6 +34,34 @@ except:
 class _SetpgidCompleteMsg(object):
     "message sent to by first process to indicate that setpgid is complete"
     pass
+
+
+_defaultLogger = None
+_defaultLogLevel = logging.DEBUG
+
+
+def setDefaultLogger(logger):
+    """Set the default pipettor logger used in logging command and errors.
+    If None, there is no default logging.  Standard value is None"""
+    global _defaultLogger
+    _defaultLogger = logging
+
+
+def getDefaultLogger():
+    """return the current value of the pipettor default logger"""
+    return _defaultLogger
+
+
+def setDefaultLogLevel(level):
+    """Set the default pipettor log level to use in logging command and errors.
+    Standard value is logging.DEBUG"""
+    global _defaultLogLevel
+    _defaultLogLevel = level
+
+
+def getDefaultLogLevel():
+    """Get the default pipettor log level to use in logging command and errors."""
+    return _defaultLogLevel
 
 
 class Process(object):
@@ -293,7 +322,7 @@ class Process(object):
 
     def failed(self):
         "check if process failed, call after poll() or wait()"
-        return (self.exceptInfo is not None)
+        return (self.exceptinfo is not None)
 
 
 class Pipeline(object):
@@ -316,7 +345,8 @@ class Pipeline(object):
     is provided, the contents of stderr from all process will be included in
     the exception.
     """
-    def __init__(self, cmds, stdin=None, stdout=None, stderr=DataReader):
+    def __init__(self, cmds, stdin=None, stdout=None, stderr=DataReader,
+                 logger=None, logLevel=None):
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
@@ -327,6 +357,8 @@ class Pipeline(object):
         self.started = False   # have processes been started
         self.running = False   # processes are running (or wait has not been called)
         self.finished = False  # have all processes finished
+        self.logger = logger if logger is not None else getDefaultLogger()
+        self.logLevel = logLevel if logLevel is not None else getDefaultLogLevel()
 
         if isinstance(cmds[0], str):
             cmds = [cmds]  # one-process pipeline
@@ -412,10 +444,17 @@ class Pipeline(object):
 
     def __finish(self):
         "finish up when no errors have occurred"
+        assert not self.failed()
         self.finished = True
         self.running = False
         for d in self.devs:
             d.close()
+        if self.logger is not None:
+            self.logger.log(self.logLevel, "success: {}".format(str(self)))
+
+    def __log_failure(self, ex):
+        if self.logger is not None:
+            self.logger.log(self.logLevel, "failure: {}: {}".format(str(self), str(ex)))
 
     def __error_cleanup_dev(self, dev):
         try:
@@ -440,6 +479,8 @@ class Pipeline(object):
 
     def start(self):
         """start processes"""
+        if self.logger is not None:
+            self.logger.log(self.logLevel, "start: {}".format(str(self)))
         self.started = True
         self.running = True
         # clean up devices and process if there is a failure
@@ -448,20 +489,26 @@ class Pipeline(object):
             self.__post_fork_parent()
             self.__exec_barrier()
             self.__post_exec_parent()
-        except:
+        except Exception, ex:
+            self.__log_failure(ex)
             self.__error_cleanup()
             raise
 
     def _raise_if_failed(self):
         """raise exception if any process has one, otherwise do nothing"""
-        for p in self.procs:
-            p._raise_if_failed()
+        try:
+            for p in self.procs:
+                p._raise_if_failed()
+        except Exception, ex:
+            self.__log_failure(ex)
+            raise
 
     def __poll(self):
         for p in self.procs:
             if not p.poll():
                 return False
         self.__finish()
+        return True
 
     def poll(self):
         """Check if all of the processes have completed.  Return True if it
@@ -469,11 +516,10 @@ class Pipeline(object):
         if not self.started:
             self.start()
         try:
-            self.__poll()
+            return self.__poll()
         except:
             self.__error_cleanup()
             raise
-        return True
 
     def __wait_on_one(self):
         "wait on the next process in group to complete, return False if no more"
@@ -490,7 +536,6 @@ class Pipeline(object):
     def __wait(self):
         while self.__wait_on_one():
             pass
-        self.__finish()
 
     def wait(self):
         """Wait for all of the process to complete. Generate an exception if
@@ -500,10 +545,12 @@ class Pipeline(object):
             self.start()
         try:
             self.__wait()
-        except:
+        except Exception, ex:
+            self.__log_failure(ex)
             self.__error_cleanup()
             raise
         self._raise_if_failed()
+        self.__finish()
 
     def shutdown(self):
         """Close down the pipeline prematurely. If the pipeline is running,
@@ -511,7 +558,7 @@ class Pipeline(object):
         differs from wait in the fact that it doesn't start the pipeline if it
         has not been started, just frees up open pipes. Primary intended
         for error recovery"""
-        # FIXME: need to restructure some of this funcions
+        # FIXME: need to restructure some of these functions
         if self.running:
             self.__error_cleanup()
         else:
@@ -633,7 +680,9 @@ class Popen(Pipeline):
 
     def poll(self):
         "poll is not allowed for Pipeline objects"
-        # don't know what to do about our open pipe, so disallow it
+        # FIXME: don't know what to do about our open pipe keeping process from
+        # existing so we can get a status, so disallow it. Not sure how to
+        # address this.  Can probably address this with select on pipe.
         raise PipettorException("Pipeline.poll() is not supported")
 
     def close(self):
