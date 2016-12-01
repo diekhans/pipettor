@@ -582,7 +582,7 @@ class Popen(Pipeline):
     .. automethod:: __init__
     """
 
-    def __init__(self, cmds, mode='r', stdin=None, stdout=None):
+    def __init__(self, cmds, mode='r', stdin=None, stdout=None, logger=None, logLevel=None):
         """cmds is either a list of arguments for a single process, or a list of such
         lists for a pipeline.  Mode is 'r' for a pipeline who's output will be
         read, or 'w' for a pipeline to that is to have data written to it.  If
@@ -620,7 +620,7 @@ class Popen(Pipeline):
             lastOut = stdout
             self.__child_fd = pipe_read_fd
             self.__parent_fh = os.fdopen(pipe_write_fd, mode)
-        super(Popen, self).__init__(cmds, stdin=firstIn, stdout=lastOut)
+        super(Popen, self).__init__(cmds, stdin=firstIn, stdout=lastOut, logger=logger, logLevel=logLevel)
         self.start()
         os.close(self.__child_fd)
         self.__child_fd = None
