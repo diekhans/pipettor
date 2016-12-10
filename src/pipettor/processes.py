@@ -42,9 +42,10 @@ _defaultLogLevel = logging.DEBUG
 
 def setDefaultLogger(logger):
     """Set the default pipettor logger used in logging command and errors.
-    If None, there is no default logging.  Standard value is None"""
+    If None, there is no default logging.  The logger can be the name of
+    a logger or the logger itself.  Standard value is None"""
     global _defaultLogger
-    _defaultLogger = logging
+    _defaultLogger = logging.getLogger(logger) if isinstance(logger, str) else loggera
 
 
 def getDefaultLogger():
@@ -63,7 +64,21 @@ def getDefaultLogLevel():
     """Get the default pipettor log level to use in logging command and errors."""
     return _defaultLogLevel
 
+def _getLoggerToUse(logger):
+    """if logger is None, get default, otherwise if it's a string, look it up,
+    otherwise it's the logger object."""
+    if logger is None:
+        return _defaultLogger
+    elif isinstance(logger, str):
+        return logging.getLogger(logger)
+    else:
+        return logger
 
+def _getLogLevelToUse(logLevel):
+    "get log level to use, either what is specified or default"
+    return logLevel if logLevel is not None else getDefaultLogLevel()
+
+    
 class Process(object):
     """A process, represented as a node a pipeline Proc objects, connected by
     Dev objects.
@@ -344,6 +359,11 @@ class Pipeline(object):
     exception if an occurs in that process.  If an instance of DataReader
     is provided, the contents of stderr from all process will be included in
     the exception.
+
+    Command arguments will be converted to strings.
+
+    The logger argument can be the name of a logger or a logger object.  If
+    none, default is user.
     """
     def __init__(self, cmds, stdin=None, stdout=None, stderr=DataReader,
                  logger=None, logLevel=None):
@@ -357,17 +377,25 @@ class Pipeline(object):
         self.started = False   # have processes been started
         self.running = False   # processes are running (or wait has not been called)
         self.finished = False  # have all processes finished
-        self.logger = logger if logger is not None else getDefaultLogger()
-        self.logLevel = logLevel if logLevel is not None else getDefaultLogLevel()
+        self.logger = _getLoggerToUse(logger)
+        self.logLevel = _getLogLevelToUse(logLevel)
 
         if isinstance(cmds[0], str):
             cmds = [cmds]  # one-process pipeline
+        cmds = self.__stringify(cmds)
         try:
             self.__setup_processes(cmds)
         except:
             self.__error_cleanup()
             raise
 
+    @staticmethod
+    def __stringify(cmds):
+        ncmds = []
+        for cmd in cmds:
+            ncmds.append([str(a) for a in cmd])
+        return ncmds
+        
     def __setup_processes(self, cmds):
         prevPipe = None
         lastCmdIdx = len(cmds) - 1
@@ -597,6 +625,10 @@ class Popen(Pipeline):
         write pipeline ('w')
           Popen --> cmd[0] --> ... --> cmd[n] --> stdout
 
+        Command arguments will be converted to strings.
+
+        The logger argument can be the name of a logger or a logger object.  If
+        none, default is user.
         """
         self.mode = mode
         self.__parent_fh = None

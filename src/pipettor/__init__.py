@@ -30,6 +30,8 @@ def run(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLevel=
     :class:`pipettor.DataReader` is provided, the contents of stderr from all
     process will be included in the exception.
 
+    The logger argument can be the name of a logger or a logger object.  If
+    none, default is user.
     """
     Pipeline(cmds, stdin=stdin, stdout=stdout, stderr=stderr).wait()
 
@@ -41,6 +43,9 @@ def runout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None):
 
     See the :func:`pipettor.run` function for more details.  Use
     `str.splitlines()` to split result into lines.
+
+    The logger argument can be the name of a logger or a logger object.  If
+    none, default is user.
     """
     dr = DataReader()
     Pipeline(cmds, stdin=stdin, stdout=dr, stderr=stderr, logger=logger, logLevel=logLevel).wait()
@@ -69,6 +74,9 @@ def runlex(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLev
     pipeline is created.  Elements that are strings are split
     into arguments to form commands.  Elements that are lists
     are treated as commands without splitting.
+
+    The logger argument can be the name of a logger or a logger object.  If
+    none, default is user.
     """
     run(_lexcmds(cmds), stdin=stdin, stdout=stdout, stderr=stderr)
 
@@ -83,6 +91,9 @@ def runlexout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None):
     pipeline is created.  Elements that are strings are split
     into arguments to form commands.  Elements that are lists
     are treated as commands without splitting.
+
+    The logger argument can be the name of a logger or a logger object.  If
+    none, default is user.
     """
     return runout(_lexcmds(cmds), stdin=stdin, stderr=stderr)
 
