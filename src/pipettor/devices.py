@@ -9,6 +9,7 @@ import fcntl
 import errno
 import threading
 import pickle
+import six
 from pipettor.exceptions import PipettorException
 
 

@@ -9,7 +9,9 @@ import errno
 import re
 import glob
 import logging
-import StringIO
+import six
+
+xrange = six.moves.builtins.range
 
 try:
     MAXFD = os.sysconf("SC_OPEN_MAX")
@@ -54,7 +56,7 @@ class TestLogging():
     def __init__(self, level=logging.DEBUG):
         self.logger = logging.getLogger(str(id(self)))
         self.logger.setLevel(level)
-        self.__buffer = StringIO.StringIO()
+        self.__buffer = six.StringIO()
         self.logger.addHandler(logging.StreamHandler(self.__buffer))
 
     @property
@@ -223,4 +225,4 @@ class TestCaseBase(unittest.TestCase):
     def assertRegexpMatchesDotAll(self, obj, expectRe, msg=None):
         """Fail if the str(obj) does not match expectRe operator, including `.' matching newlines"""
         if not re.match(expectRe, str(obj), re.DOTALL):
-            raise self.failureException, (msg or "'%s' does not match '%s'" % (str(obj), expectRe))
+            raise self.failureException(msg or "'{}' does not match '{}'".format(str(obj), expectRe))

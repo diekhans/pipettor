@@ -10,6 +10,7 @@ import gc
 import errno
 import pipes
 import logging
+import six
 from pipettor.devices import _validate_mode
 from pipettor.devices import Dev
 from pipettor.devices import DataReader
@@ -20,6 +21,7 @@ from pipettor.exceptions import PipettorException
 from pipettor.exceptions import ProcessException
 from pipettor.exceptions import _warn_error_during_error_handling
 
+xrange = six.moves.builtins.range
 
 # FIXME: C-c problems:
 # http://code.activestate.com/recipes/496735-workaround-for-missed-sigint-in-multithreaded-prog/
@@ -285,7 +287,7 @@ class Process(object):
     def _raise_if_failed(self):
         """raise exception if one is saved, otherwise do nothing"""
         if self.exceptinfo is not None:
-            raise self.exceptinfo[0], self.exceptinfo[1], self.exceptinfo[2]
+            six.reraise(self.exceptinfo[0], self.exceptinfo[1], self.exceptinfo[2])
 
     def __parent_stdio_exit_close(self):
         "close devices on edit"
@@ -517,7 +519,7 @@ class Pipeline(object):
             self.__post_fork_parent()
             self.__exec_barrier()
             self.__post_exec_parent()
-        except Exception, ex:
+        except Exception as ex:
             self.__log_failure(ex)
             self.__error_cleanup()
             raise
@@ -527,7 +529,7 @@ class Pipeline(object):
         try:
             for p in self.procs:
                 p._raise_if_failed()
-        except Exception, ex:
+        except Exception as ex:
             self.__log_failure(ex)
             raise
 
@@ -573,7 +575,7 @@ class Pipeline(object):
             self.start()
         try:
             self.__wait()
-        except Exception, ex:
+        except Exception as ex:
             self.__log_failure(ex)
             self.__error_cleanup()
             raise
