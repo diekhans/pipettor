@@ -5,10 +5,13 @@ import sys
 import os
 import re
 import signal
+import six
 if __name__ == '__main__':
     sys.path.insert(0, os.path.normpath(os.path.dirname(sys.argv[0])) + "/../src")
 from pipettor import Pipeline, Popen, ProcessException, PipettorException, DataReader, DataWriter, File, run, runout, runlex, runlexout
 from testCaseBase import TestCaseBase, TestLogging
+
+xrange = six.moves.builtins.range
 
 # this keeps OS/X crash reporter from popping up on unittest error
 signal.signal(signal.SIGQUIT,
@@ -41,14 +44,14 @@ class PipettorTestBase(TestCaseBase):
                 self.assertEqual(s, expectStr)
         self.orphanChecks(nopen)
 
-    def checkProgWithError(self, gotMsg, progArgs=None):
+    def checkProgWithError(self, gotExcept, progArgs=None):
         expectReTmpl = "^process exited 1: .+/progWithError{}{}:\nTHIS GOES TO STDERR{}{}.*$"
         if progArgs is not None:
             expectRe = expectReTmpl.format(" ", progArgs, ": ", progArgs)
         else:
             expectRe = expectReTmpl.format("", "", "", "")
-        if not re.match(expectRe, gotMsg, re.MULTILINE):
-            self.fail("'" + gotMsg + "' does not match '" + str(expectRe))
+        if not re.match(expectRe, str(gotExcept), re.MULTILINE):
+            self.fail("'{}' does not match '{}'".format(str(gotExcept), str(expectRe)))
 
 
 class PipelineTests(PipettorTestBase):
@@ -72,7 +75,7 @@ class PipelineTests(PipettorTestBase):
     def testTrivialFailPoll(self):
         nopen = self.numOpenFiles()
         pl = Pipeline([("sleep", "1"), ("false",)])
-        with self.assertRaisesRegexp(ProcessException, "^process exited 1: sleep 1 | false$"):
+        with six.assertRaisesRegex(self, ProcessException, "^process exited 1: sleep 1 | false$"):
             pl.wait()
         self.commonChecks(nopen, pl, "sleep 1 | false 2>[DataReader]")
 
@@ -100,7 +103,7 @@ class PipelineTests(PipettorTestBase):
         nopen = self.numOpenFiles()
         log = TestLogging()
         pl = Pipeline([("false",), ("true",)], logger=log.logger)
-        with self.assertRaisesRegexp(ProcessException, "^process exited 1: false$"):
+        with six.assertRaisesRegex(self, ProcessException, "^process exited 1: false$"):
             pl.wait()
         self.commonChecks(nopen, pl, "false | true 2>[DataReader]")
         self.assertEqual(log.data, """start: false | true 2>[DataReader]\n"""
@@ -112,7 +115,7 @@ class PipelineTests(PipettorTestBase):
         pl = Pipeline([("true",), (os.path.join(self.getTestDir(), "progWithError"),), ("false",)], stderr=DataReader)
         with self.assertRaises(ProcessException) as cm:
             pl.wait()
-        self.checkProgWithError(str(cm.exception))
+        self.checkProgWithError(cm.exception)
         self.orphanChecks(nopen)
 
     def testPipeFail3Stderr(self):
@@ -126,10 +129,10 @@ class PipelineTests(PipettorTestBase):
         with self.assertRaises(ProcessException) as cm:
             pl.wait()
         # should be first process
-        self.checkProgWithError(str(cm.exception), "process0")
+        self.checkProgWithError(cm.exception, "process0")
         # check process exceptinfo fields
         for i in xrange(3):
-            self.checkProgWithError(str(pl.procs[i].exceptinfo[0]), "process{}".format(i))
+            self.checkProgWithError(pl.procs[i].exceptinfo[1], "process{}".format(i))
         self.orphanChecks(nopen)
 
     def testExecFail(self):
@@ -142,8 +145,8 @@ class PipelineTests(PipettorTestBase):
         expect = "exec failed: procDoesNotExist -r,\n    caused by: OSError: [Errno 2] No such file or directory"
         msg = str(cm.exception)
         if not msg.startswith(expect):
-            self.fail("'" + msg + "' does not start with '"
-                      + expect + "', cause: " + str(getattr(cm.exception, "cause", None)))
+            self.fail("'{}' does not start with '{}', cause: {}".format(msg, expect,
+                                                                        str(getattr(cm.exception, "cause", None))))
         self.commonChecks(nopen, pl, "procDoesNotExist -r <[DataWriter] 2>[DataReader]")
 
     def testSignaled(self):
@@ -190,7 +193,7 @@ class PipelineTests(PipettorTestBase):
         self.commonChecks(nopen, pl, "^cat -u <\\[DataWriter\\] \\| cat -u >\\[DataReader\\] 2>\\[DataReader\\]$", isRe=True)
 
     def testFileMode(self):
-        with self.assertRaisesRegexp(PipettorException, "^invalid mode: 'q', expected 'r', 'w', or 'a' with optional 'b' suffix$"):
+        with six.assertRaisesRegexp(self, PipettorException, "^invalid mode: 'q', expected 'r', 'w', or 'a' with optional 'b' suffix$"):
             File("/dev/null", "q")
 
     def testCollectStdoutErr(self):
@@ -267,7 +270,7 @@ class PipelineTests(PipettorTestBase):
     def testBogusStdin(self):
         # test stdin specification is not legal
         nopen = self.numOpenFiles()
-        with self.assertRaisesRegexp(PipettorException, "^invalid stdio specification object type: <type 'float'> 3\\.14159$"):
+        with six.assertRaisesRegexp(self, PipettorException, "^invalid stdio specification object type: <type 'float'> 3\\.14159$"):
             pl = Pipeline([("date",), ("date",)], stdin=3.14159)
             pl.wait()
         self.orphanChecks(nopen)
@@ -275,7 +278,7 @@ class PipelineTests(PipettorTestBase):
     def testBogusStdout(self):
         # test stdout specification is not legal
         nopen = self.numOpenFiles()
-        with self.assertRaisesRegexp(PipettorException, "^invalid stdio specification object type: <type 'float'> 3\\.14159$"):
+        with six.assertRaisesRegexp(self, PipettorException, "^invalid stdio specification object type: <type 'float'> 3\\.14159$"):
             pl = Pipeline([("date",), ("date",)], stdout=3.14159)
             pl.wait()
         self.orphanChecks(nopen)
@@ -283,7 +286,7 @@ class PipelineTests(PipettorTestBase):
     def testBogusStderr(self):
         # test stderr specification is not legal
         nopen = self.numOpenFiles()
-        with self.assertRaisesRegexp(PipettorException, "^invalid stdio specification object type: <type 'float'> 3\\.14159$"):
+        with six.assertRaisesRegexp(self, PipettorException, "^invalid stdio specification object type: <type 'float'> 3\\.14159$"):
             pl = Pipeline([("date",), ("date",)], stderr=3.14159)
             pl.wait()
         self.orphanChecks(nopen)
@@ -292,7 +295,7 @@ class PipelineTests(PipettorTestBase):
         # test stderr specification is not legal
         nopen = self.numOpenFiles()
         dr = DataReader()
-        with self.assertRaisesRegexp(PipettorException, "^DataReader already bound to a process$"):
+        with six.assertRaisesRegexp(self, PipettorException, "^DataReader already bound to a process$"):
             pl = Pipeline([("date",), ("date",)], stdout=dr, stderr=dr)
             pl.wait()
         self.orphanChecks(nopen)
@@ -301,7 +304,7 @@ class PipelineTests(PipettorTestBase):
         # test stderr specification is not legal
         nopen = self.numOpenFiles()
         dw = DataWriter("fred")
-        with self.assertRaisesRegexp(PipettorException, "^DataWriter already bound to a process$"):
+        with six.assertRaisesRegexp(self, PipettorException, "^DataWriter already bound to a process$"):
             pl1 = Pipeline([("cat", "/dev/null"), ("cat", "/dev/null")], stdin=dw)
             Pipeline([("cat", "/dev/null"), ("cat", "/dev/null")], stdin=dw)
         pl1.shutdown()  # clean up unstarted process
@@ -398,7 +401,7 @@ class PopenTests(PipettorTestBase):
     def testExitCode(self):
         nopen = self.numOpenFiles()
         pl = Popen(("false",))
-        with self.assertRaisesRegexp(ProcessException, "^process exited 1: false$"):
+        with six.assertRaisesRegexp(self, ProcessException, "^process exited 1: false$"):
             pl.wait()
         for p in pl.procs:
             self.assertTrue(p.returncode == 1)
@@ -427,7 +430,7 @@ class FunctionTests(PipettorTestBase):
 
     def testSimplePipeFail(self):
         nopen = self.numOpenFiles()
-        with self.assertRaisesRegexp(ProcessException, "^process exited 1: false$"):
+        with six.assertRaisesRegexp(self, ProcessException, "^process exited 1: false$"):
             run([("false",), ("true",)])
         self.orphanChecks(nopen)
 
@@ -445,7 +448,7 @@ class FunctionTests(PipettorTestBase):
         inf = self.getInputFile("simple1.txt")
         with self.assertRaises(ProcessException) as cm:
             runout([("sort", "-r"), (os.path.join(self.getTestDir(), "progWithError"),), ("false",)], stdin=inf)
-        self.checkProgWithError(str(cm.exception))
+        self.checkProgWithError(cm.exception)
         self.orphanChecks(nopen)
 
     def testWriteFileLex(self):

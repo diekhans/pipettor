@@ -303,7 +303,7 @@ class Process(object):
             stderr = self.stderr.data
         # don't save exception if we force it to be ill
         if not self.forced:
-            self.exceptinfo = (ProcessException(str(self), self.returncode, stderr), None, None)
+            self.exceptinfo = (ProcessException, ProcessException(str(self), self.returncode, stderr), None)
 
     def _handle_exit(self, waitStat):
         """Handle process exiting, saving status  """

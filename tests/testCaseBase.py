@@ -196,13 +196,14 @@ class TestCaseBase(unittest.TestCase):
 
     def assertNoChildProcs(self):
         "fail if there are any running or zombie child process"
-        ex = None
+        foundChild = True
         try:
             s = os.waitpid(0, os.WNOHANG)
         except OSError as ex:
             if ex.errno != errno.ECHILD:
                 raise
-        if ex is None:
+            foundChild = False
+        if foundChild:
             self.fail("pending child processes or zombies: " + str(s))
 
     @staticmethod

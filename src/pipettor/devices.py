@@ -47,6 +47,9 @@ class Dev(object):
        write_fd - file integer descriptor for writing
        write_fh - file object for writing"""
 
+    def __init__(self, binary):
+        self.binary = binary
+        
     def _bind_read_to_process(self, process):
         """associate read side with child process."""
         pass
@@ -82,12 +85,15 @@ class Dev(object):
 class DataReader(Dev):
     """Object to asynchronously read data from process into memory via a pipe.  A
     thread is use to prevent deadlock when both reading and writing to a child
-    pipeline.
+    pipeline.  
+
+    For Python3, specifying binary results in data of type bytes, otherwise
+    str.
     """
-    def __init__(self):
-        super(DataReader, self).__init__()
+    def __init__(self, binary=False):
+        super(DataReader, self).__init__(binary)
         read_fd, self.write_fd = os.pipe()
-        self.read_fh = os.fdopen(read_fd, "rb")
+        self.read_fh = os.fdopen(read_fd, "rb" if binary else "r")
         self.__process = None
         self.__buffer = []
         self.__thread = None
@@ -139,8 +145,11 @@ class DataReader(Dev):
 
     @property
     def data(self):
-        "return buffered data as a string"
-        return "".join(self.__buffer)
+        "return buffered data as a string or bytes"
+        if self.binary:
+            return b"".join(self.__buffer)
+        else:
+            return "".join(self.__buffer)
 
 
 class DataWriter(Dev):
@@ -149,8 +158,8 @@ class DataWriter(Dev):
     pipeline.
     """
 
-    def __init__(self, data):
-        super(DataWriter, self).__init__()
+    def __init__(self, data, binary=False):
+        super(DataWriter, self).__init__(binary)
         self.__data = data
         self.read_fd, write_fd = os.pipe()
         self.write_fh = os.fdopen(write_fd, "wb")
@@ -216,8 +225,9 @@ class File(Dev):
     with files."""
 
     def __init__(self, path, mode="r"):
-        """constructor, mode is standard r,w, or a with optional, but meaningless, b"""
-        super(File, self).__init__()
+        """constructor, mode is standard r,w, or a with, include b for
+        binary data"""
+        super(File, self).__init__(mode.find("b") >= 0)
         self.__path = path
         self.__mode = mode
         # only one of the file descriptors is ever opened
@@ -250,13 +260,12 @@ class File(Dev):
         """post-fork child setup."""
         self.close()
 
-
 class _SiblingPipe(Dev):
     """Interprocess communication between two child process by anonymous
     pipes."""
 
-    def __init__(self):
-        super(_SiblingPipe, self).__init__()
+    def __init__(self, binary=False):
+        super(_SiblingPipe, self).__init__(binary)
         self.read_fd, self.write_fd = os.pipe()
 
     def __del__(self):
