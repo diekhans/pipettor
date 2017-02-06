@@ -5,7 +5,7 @@ from __future__ import print_function
 import shlex
 from pipettor.exceptions import PipettorException, ProcessException
 from pipettor.devices import Dev, DataReader, DataWriter, File
-from pipettor.processes import Pipeline, Popen, setDefaultLogger, getDefaultLogger, setDefaultLogLevel, getDefaultLogLevel
+from pipettor.processes import Pipeline, Popen, setDefaultLogger, getDefaultLogger, setDefaultLogLevel, getDefaultLogLevel, _isstr
 
 __version__ = "0.1a1"
 
@@ -50,10 +50,6 @@ def runout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None):
     dr = DataReader()
     Pipeline(cmds, stdin=stdin, stdout=dr, stderr=stderr, logger=logger, logLevel=logLevel).wait()
     return dr.data
-
-
-def _isstr(cmd):
-    return isinstance(cmd, str) or isinstance(cmd, unicode)
 
 
 def _lexcmds(cmds):
@@ -103,4 +99,4 @@ __all__ = (PipettorException.__name__, ProcessException.__name__,
            File.__name__, Pipeline.__name__, Popen.__name__,
            setDefaultLogger.__name__, getDefaultLogger.__name__,
            setDefaultLogLevel.__name__, getDefaultLogLevel.__name__,
-           run.__name__, runout.__name__, runlex.__name__, runlexout.__name__,)
+           run.__name__, runout.__name__, runlex.__name__, runlexout.__name__)

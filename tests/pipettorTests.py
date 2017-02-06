@@ -9,7 +9,7 @@ import six
 if __name__ == '__main__':
     sys.path.insert(0, os.path.normpath(os.path.dirname(sys.argv[0])) + "/../src")
 from pipettor import Pipeline, Popen, ProcessException, PipettorException, DataReader, DataWriter, File, run, runout, runlex, runlexout
-from testCaseBase import TestCaseBase, TestLogging
+from .testCaseBase import TestCaseBase, TestLogging
 
 # prevent MacOS  crash reporter
 def sigquit_handler(signum, frame):
@@ -153,10 +153,9 @@ class PipelineTests(PipettorTestBase):
             expect = "exec failed: procDoesNotExist -r:\nOSError(2, 'No such file or directory')"
             self.assertEqual(msg, expect)
         else:
-            expect = "exec failed: procDoesNotExist -r"
+            expect = "exec failed: procDoesNotExist -r:\nFileNotFoundError(2, 'No such file or directory')"
             self.assertEqual(msg, expect)
             # FIXME: cause is lost
-            # print("cause=", cm.exception.__cause__)
         self.commonChecks(nopen, pl, "procDoesNotExist -r <[DataWriter] 2>[DataReader]")
 
     def testSignaled(self):
@@ -227,20 +226,20 @@ class PipelineTests(PipettorTestBase):
         fh.close()
         pl = Pipeline(("cat",), stdin=dw, stdout=outf)
         pl.wait()
-        self.diffExpected(".out", expectedBasename="file.binary")
+        self.diffBinaryExpected(".out", expectedBasename="file.binary")
         self.commonChecks(nopen, pl, "^cat <\\[DataWriter] >.*/output/pipettorTests.PipelineTests.testStdinMemBinary.out 2>\\[DataReader\\]$", isRe=True)
 
     def testStdoutMemBinary(self):
         # binary read from stdout into memory
         nopen = self.numOpenFiles()
         inf = self.getInputFile("file.binary")
-        dr = DataReader()
+        dr = DataReader(binary=True)
         pl = Pipeline(("cat",), stdin=inf, stdout=dr)
         pl.wait()
         fh = open(self.getOutputFile(".out"), "wb")
         fh.write(dr.data)
         fh.close()
-        self.diffExpected(".out", expectedBasename="file.binary")
+        self.diffBinaryExpected(".out", expectedBasename="file.binary")
         self.commonChecks(nopen, pl, "^cat <.*/input/file.binary >\\[DataReader] 2>\\[DataReader\\]$", isRe=True)
 
     def testWriteFile(self):
@@ -277,10 +276,16 @@ class PipelineTests(PipettorTestBase):
         self.diffExpected(".out")
         self.commonChecks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/pipettorTests.PipelineTests.testAppendFile.out$", isRe=True)
 
+    def __bogusStdioExpectRe(self):
+        if six.PY3:
+            return "^invalid stdio specification object type: <class 'float'> 3\\.14159$"
+        else:
+            return "^invalid stdio specification object type: <type 'float'> 3\\.14159$"
+        
     def testBogusStdin(self):
         # test stdin specification is not legal
         nopen = self.numOpenFiles()
-        with six.assertRaisesRegex(self, PipettorException, "^invalid stdio specification object type: <type 'float'> 3\\.14159$"):
+        with six.assertRaisesRegex(self, PipettorException, self.__bogusStdioExpectRe()):
             pl = Pipeline([("date",), ("date",)], stdin=3.14159)
             pl.wait()
         self.orphanChecks(nopen)
@@ -288,7 +293,7 @@ class PipelineTests(PipettorTestBase):
     def testBogusStdout(self):
         # test stdout specification is not legal
         nopen = self.numOpenFiles()
-        with six.assertRaisesRegex(self, PipettorException, "^invalid stdio specification object type: <type 'float'> 3\\.14159$"):
+        with six.assertRaisesRegex(self, PipettorException, self.__bogusStdioExpectRe()):
             pl = Pipeline([("date",), ("date",)], stdout=3.14159)
             pl.wait()
         self.orphanChecks(nopen)
@@ -296,7 +301,7 @@ class PipelineTests(PipettorTestBase):
     def testBogusStderr(self):
         # test stderr specification is not legal
         nopen = self.numOpenFiles()
-        with six.assertRaisesRegex(self, PipettorException, "^invalid stdio specification object type: <type 'float'> 3\\.14159$"):
+        with six.assertRaisesRegex(self, PipettorException, self.__bogusStdioExpectRe()):
             pl = Pipeline([("date",), ("date",)], stderr=3.14159)
             pl.wait()
         self.orphanChecks(nopen)

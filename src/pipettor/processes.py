@@ -33,6 +33,11 @@ except:
     MAXFD = 256
 
 
+def _isstr(s):
+    "py 2/3 compatible check for a string"
+    return isinstance(s, str) or (six.PY2 and isinstance(s, unicode))
+
+
 class _SetpgidCompleteMsg(object):
     "message sent to by first process to indicate that setpgid is complete"
     pass
@@ -128,13 +133,14 @@ class Process(object):
 
     def __wrapProcessException(self, cause):
         """wrap in ProcessException without losing causing exception, on Py3, use
-        exception chaining, on PY2, set as stderr"""
+        exception chaining, on PY2, set as stderr, however __cause__ is not
+        pickled, so we set it in stderr now too.
+        """
         if six.PY3:
             try:
-                six.raise_from(ProcessException(str(self)), cause)
+                # FIXME: __cause__ not pickled, so set stderr too
+                six.raise_from(ProcessException(str(self), stderr=repr(cause)), cause)
             except Exception as ex2:
-                print("send cause", ex2.__cause__)
-                sys.stderr.flush()
                 return ex2
         else:
             return ProcessException(str(self), stderr=repr(cause))
@@ -149,7 +155,7 @@ class Process(object):
             return spec  # passed unchanged
         elif callable(getattr(spec, "fileno", None)):
             return spec.fileno()  # is file-like
-        elif isinstance(spec, str) or isinstance(spec, unicode):
+        elif _isstr(spec):
             return File(spec, mode)
         else:
             raise PipettorException("invalid stdio specification object type: {} {}".format(type(spec), spec))

@@ -158,11 +158,11 @@ class DataWriter(Dev):
     pipeline.
     """
 
-    def __init__(self, data, binary=False):
-        super(DataWriter, self).__init__(binary)
+    def __init__(self, data):
+        super(DataWriter, self).__init__(False if isinstance(data, str) else True )
         self.__data = data
         self.read_fd, write_fd = os.pipe()
-        self.write_fh = os.fdopen(write_fd, "wb")
+        self.write_fh = os.fdopen(write_fd, "wb" if self.binary else "w")
         self.__thread = None
         self.__process = None
 
