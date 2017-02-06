@@ -33,7 +33,7 @@ def _validate_mode(mode, allow_append):
     mode_re = _rwa_re if allow_append else _rw_re
     if mode_re.match(mode) is None:
         expect = "'r', 'w', or 'a'" if allow_append else "'r' or 'w'"
-        raise PipettorException("invalid mode: '%s', expected %s with optional 'b' suffix" % (mode, expect))
+        raise PipettorException("invalid mode: '{}', expected {} with optional 'b' suffix".format(mode, expect))
 
 
 class Dev(object):

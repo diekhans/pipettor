@@ -80,7 +80,6 @@ def _getLogLevelToUse(logLevel):
     "get log level to use, either what is specified or default"
     return logLevel if logLevel is not None else getDefaultLogLevel()
 
-    
 class Process(object):
     """A process, represented as a node a pipeline Proc objects, connected by
     Dev objects.
@@ -126,6 +125,19 @@ class Process(object):
         for arg in self.cmd:
             strs.append(pipes.quote(str(arg)))
         return " ".join(strs)
+
+    def __wrapProcessException(self, cause):
+        """wrap in ProcessException without losing causing exception, on Py3, use
+        exception chaining, on PY2, set as stderr"""
+        if six.PY3:
+            try:
+                six.raise_from(ProcessException(str(self)), cause)
+            except Exception as ex2:
+                print("send cause", ex2.__cause__)
+                sys.stderr.flush()
+                return ex2
+        else:
+            return ProcessException(str(self), stderr=repr(cause))
 
     def __stdio_assoc(self, spec, mode):
         """pre-fork check a stdio spec validity and associate Dev or file
@@ -207,7 +219,7 @@ class Process(object):
             self.__child_exec()
         except Exception as ex:
             if not isinstance(ex, ProcessException):
-                ex = ProcessException(str(self), cause=ex)
+                ex = self.__wrapProcessException(ex)
             self.status_pipe.send(ex)
             os._exit(255)
 
@@ -274,9 +286,9 @@ class Process(object):
         ex = self.status_pipe.receive()
         if ex is not None:
             if not isinstance(ex, Exception):
-                ex = PipettorException("unexpected object return from child exec status pipe: %s: %s" % (str(type(ex)), str(ex)))
+                ex = PipettorException("unexpected object return from child exec status pipe: {}: {}".format(type(ex), ex))
             if not isinstance(ex, ProcessException):
-                ex = ProcessException(str(self), cause=ex)
+                ex = self.__wrapProcessException(ex)
             raise ex
         self.status_pipe.close()
 
