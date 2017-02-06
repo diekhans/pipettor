@@ -9,7 +9,9 @@ import errno
 import re
 import glob
 import logging
-import StringIO
+import six
+
+xrange = six.moves.builtins.range
 
 try:
     MAXFD = os.sysconf("SC_OPEN_MAX")
@@ -54,7 +56,7 @@ class TestLogging():
     def __init__(self, level=logging.DEBUG):
         self.logger = logging.getLogger(str(id(self)))
         self.logger.setLevel(level)
-        self.__buffer = StringIO.StringIO()
+        self.__buffer = six.StringIO()
         self.logger.addHandler(logging.StreamHandler(self.__buffer))
 
     @property
@@ -129,10 +131,12 @@ class TestCaseBase(unittest.TestCase):
         return self.getTestDir() + "/expected/" + (basename if basename is not None else self.getId()) + ext
 
     def __getLines(self, file):
-        fh = open(file)
-        lines = fh.readlines()
-        fh.close()
-        return lines
+        with open(file) as fh:
+            return fh.readlines()
+
+    def __getBytes(self, file):
+        with open(file, "rb") as fh:
+            return fh.read()
 
     def mustExist(self, path):
         if not os.path.exists(path):
@@ -140,8 +144,8 @@ class TestCaseBase(unittest.TestCase):
 
     def diffExpected(self, ext, expectedBasename=None):
         """diff expected and output files.  If expectedBasename is used, it is
-        inset of the test id, allowing share an expected file between multiple
-        tests."""
+        used insted of the test id to find the expected file, allowing share
+        an expected file between multiple tests."""
 
         expFile = self.getExpectedFile(ext, expectedBasename)
         expLines = self.__getLines(expFile)
@@ -155,6 +159,19 @@ class TestCaseBase(unittest.TestCase):
             sys.stdout.write(l)
             cnt += 1
         self.assertTrue(cnt == 0)
+
+    def diffBinaryExpected(self, ext, expectedBasename=None):
+        """diff expected and output binary files.  If expectedBasename is
+        used, it is used insted of the test id to find the expected file,
+        allowing share an expected file between multiple tests."""
+
+        expFile = self.getExpectedFile(ext, expectedBasename)
+        expBytes = self.__getBytes(expFile)
+
+        outFile = self.getOutputFile(ext)
+        outBytes = self.__getBytes(outFile)
+
+        self.assertEqual(outBytes, expBytes)
 
     def createOutputFile(self, ext, contents=""):
         """create an output file, filling it with contents."""
@@ -194,13 +211,14 @@ class TestCaseBase(unittest.TestCase):
 
     def assertNoChildProcs(self):
         "fail if there are any running or zombie child process"
-        ex = None
+        foundChild = True
         try:
             s = os.waitpid(0, os.WNOHANG)
         except OSError as ex:
             if ex.errno != errno.ECHILD:
                 raise
-        if ex is None:
+            foundChild = False
+        if foundChild:
             self.fail("pending child processes or zombies: " + str(s))
 
     @staticmethod
@@ -223,4 +241,4 @@ class TestCaseBase(unittest.TestCase):
     def assertRegexpMatchesDotAll(self, obj, expectRe, msg=None):
         """Fail if the str(obj) does not match expectRe operator, including `.' matching newlines"""
         if not re.match(expectRe, str(obj), re.DOTALL):
-            raise self.failureException, (msg or "'%s' does not match '%s'" % (str(obj), expectRe))
+            raise self.failureException(msg or "'{}' does not match '{}'".format(str(obj), expectRe))

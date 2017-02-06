@@ -10,6 +10,7 @@ import gc
 import errno
 import pipes
 import logging
+import six
 from pipettor.devices import _validate_mode
 from pipettor.devices import Dev
 from pipettor.devices import DataReader
@@ -20,6 +21,7 @@ from pipettor.exceptions import PipettorException
 from pipettor.exceptions import ProcessException
 from pipettor.exceptions import _warn_error_during_error_handling
 
+xrange = six.moves.builtins.range
 
 # FIXME: C-c problems:
 # http://code.activestate.com/recipes/496735-workaround-for-missed-sigint-in-multithreaded-prog/
@@ -29,6 +31,11 @@ try:
     MAXFD = os.sysconf("SC_OPEN_MAX")
 except:
     MAXFD = 256
+
+
+def _isstr(s):
+    "py 2/3 compatible check for a string"
+    return isinstance(s, str) or (six.PY2 and isinstance(s, unicode))
 
 
 class _SetpgidCompleteMsg(object):
@@ -78,7 +85,6 @@ def _getLogLevelToUse(logLevel):
     "get log level to use, either what is specified or default"
     return logLevel if logLevel is not None else getDefaultLogLevel()
 
-    
 class Process(object):
     """A process, represented as a node a pipeline Proc objects, connected by
     Dev objects.
@@ -125,6 +131,20 @@ class Process(object):
             strs.append(pipes.quote(str(arg)))
         return " ".join(strs)
 
+    def __wrapProcessException(self, cause):
+        """wrap in ProcessException without losing causing exception, on Py3, use
+        exception chaining, on PY2, set as stderr, however __cause__ is not
+        pickled, so we set it in stderr now too.
+        """
+        if six.PY3:
+            try:
+                # FIXME: __cause__ not pickled, so set stderr too
+                six.raise_from(ProcessException(str(self), stderr=repr(cause)), cause)
+            except Exception as ex2:
+                return ex2
+        else:
+            return ProcessException(str(self), stderr=repr(cause))
+
     def __stdio_assoc(self, spec, mode):
         """pre-fork check a stdio spec validity and associate Dev or file
         number.  mode is mode in child"""
@@ -135,7 +155,7 @@ class Process(object):
             return spec  # passed unchanged
         elif callable(getattr(spec, "fileno", None)):
             return spec.fileno()  # is file-like
-        elif isinstance(spec, str) or isinstance(spec, unicode):
+        elif _isstr(spec):
             return File(spec, mode)
         else:
             raise PipettorException("invalid stdio specification object type: {} {}".format(type(spec), spec))
@@ -205,7 +225,7 @@ class Process(object):
             self.__child_exec()
         except Exception as ex:
             if not isinstance(ex, ProcessException):
-                ex = ProcessException(str(self), cause=ex)
+                ex = self.__wrapProcessException(ex)
             self.status_pipe.send(ex)
             os._exit(255)
 
@@ -272,9 +292,9 @@ class Process(object):
         ex = self.status_pipe.receive()
         if ex is not None:
             if not isinstance(ex, Exception):
-                ex = PipettorException("unexpected object return from child exec status pipe: %s: %s" % (str(type(ex)), str(ex)))
+                ex = PipettorException("unexpected object return from child exec status pipe: {}: {}".format(type(ex), ex))
             if not isinstance(ex, ProcessException):
-                ex = ProcessException(str(self), cause=ex)
+                ex = self.__wrapProcessException(ex)
             raise ex
         self.status_pipe.close()
 
@@ -285,7 +305,7 @@ class Process(object):
     def _raise_if_failed(self):
         """raise exception if one is saved, otherwise do nothing"""
         if self.exceptinfo is not None:
-            raise self.exceptinfo[0], self.exceptinfo[1], self.exceptinfo[2]
+            six.reraise(self.exceptinfo[0], self.exceptinfo[1], self.exceptinfo[2])
 
     def __parent_stdio_exit_close(self):
         "close devices on edit"
@@ -301,7 +321,7 @@ class Process(object):
             stderr = self.stderr.data
         # don't save exception if we force it to be ill
         if not self.forced:
-            self.exceptinfo = (ProcessException(str(self), self.returncode, stderr), None, None)
+            self.exceptinfo = (ProcessException, ProcessException(str(self), self.returncode, stderr), None)
 
     def _handle_exit(self, waitStat):
         """Handle process exiting, saving status  """
@@ -517,7 +537,7 @@ class Pipeline(object):
             self.__post_fork_parent()
             self.__exec_barrier()
             self.__post_exec_parent()
-        except Exception, ex:
+        except Exception as ex:
             self.__log_failure(ex)
             self.__error_cleanup()
             raise
@@ -527,7 +547,7 @@ class Pipeline(object):
         try:
             for p in self.procs:
                 p._raise_if_failed()
-        except Exception, ex:
+        except Exception as ex:
             self.__log_failure(ex)
             raise
 
@@ -573,7 +593,7 @@ class Pipeline(object):
             self.start()
         try:
             self.__wait()
-        except Exception, ex:
+        except Exception as ex:
             self.__log_failure(ex)
             self.__error_cleanup()
             raise
