@@ -52,7 +52,7 @@ def setDefaultLogger(logger):
     If None, there is no default logging.  The logger can be the name of
     a logger or the logger itself.  Standard value is None"""
     global _defaultLogger
-    _defaultLogger = logging.getLogger(logger) if isinstance(logger, str) else loggera
+    _defaultLogger = logging.getLogger(logger) if isinstance(logger, str) else logger
 
 
 def getDefaultLogger():
@@ -71,6 +71,7 @@ def getDefaultLogLevel():
     """Get the default pipettor log level to use in logging command and errors."""
     return _defaultLogLevel
 
+
 def _getLoggerToUse(logger):
     """if logger is None, get default, otherwise if it's a string, look it up,
     otherwise it's the logger object."""
@@ -81,9 +82,11 @@ def _getLoggerToUse(logger):
     else:
         return logger
 
+
 def _getLogLevelToUse(logLevel):
     "get log level to use, either what is specified or default"
     return logLevel if logLevel is not None else getDefaultLogLevel()
+
 
 class Process(object):
     """A process, represented as a node a pipeline Proc objects, connected by
@@ -415,7 +418,7 @@ class Pipeline(object):
         for cmd in cmds:
             ncmds.append([str(a) for a in cmd])
         return ncmds
-        
+
     def __setup_processes(self, cmds):
         prevPipe = None
         lastCmdIdx = len(cmds) - 1

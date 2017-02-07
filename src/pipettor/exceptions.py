@@ -1,11 +1,10 @@
 # Copyright 2006-2016 Mark Diekhans
 from __future__ import print_function
 import sys
-import os
 import traceback
 import signal
-import six
 from warnings import warn
+
 
 def _signal_num_to_name(num):
     "get name for a signal number"
@@ -19,6 +18,7 @@ def _signal_num_to_name(num):
 class PipettorException(Exception):
     """Base class for Pipettor exceptions."""
     pass
+
 
 class ProcessException(PipettorException):
     """Exception associated with running a process.  A None returncode indicates
@@ -44,7 +44,7 @@ class ProcessException(PipettorException):
         # duplicated string
         return (ProcessException, (self.procDesc, self.returncode, self.stderr))
 
-        
+
 class ErrorDuringErrorHandlingWarning(Warning):
     """An error occurred while handing another error"""
     pass

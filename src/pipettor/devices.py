@@ -9,7 +9,6 @@ import fcntl
 import errno
 import threading
 import pickle
-import six
 from pipettor.exceptions import PipettorException
 
 
@@ -49,7 +48,7 @@ class Dev(object):
 
     def __init__(self, binary):
         self.binary = binary
-        
+
     def _bind_read_to_process(self, process):
         """associate read side with child process."""
         pass
@@ -85,7 +84,7 @@ class Dev(object):
 class DataReader(Dev):
     """Object to asynchronously read data from process into memory via a pipe.  A
     thread is use to prevent deadlock when both reading and writing to a child
-    pipeline.  
+    pipeline.
 
     For Python3, specifying binary results in data of type bytes, otherwise
     str.
@@ -159,7 +158,7 @@ class DataWriter(Dev):
     """
 
     def __init__(self, data):
-        super(DataWriter, self).__init__(False if isinstance(data, str) else True )
+        super(DataWriter, self).__init__(False if isinstance(data, str) else True)
         self.__data = data
         self.read_fd, write_fd = os.pipe()
         self.write_fh = os.fdopen(write_fd, "wb" if self.binary else "w")
@@ -259,6 +258,7 @@ class File(Dev):
     def _post_fork_parent(self):
         """post-fork child setup."""
         self.close()
+
 
 class _SiblingPipe(Dev):
     """Interprocess communication between two child process by anonymous

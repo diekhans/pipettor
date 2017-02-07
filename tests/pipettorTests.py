@@ -11,9 +11,9 @@ if __name__ == '__main__':
 from pipettor import Pipeline, Popen, ProcessException, PipettorException, DataReader, DataWriter, File, run, runout, runlex, runlexout
 from .testCaseBase import TestCaseBase, TestLogging
 
-# prevent MacOS  crash reporter
+
 def sigquit_handler(signum, frame):
-    print('SIGQUIT received; exiting', file=sys.stderr)
+    " prevent MacOS  crash reporter"
     sys.exit(os.EX_SOFTWARE)
 signal.signal(signal.SIGQUIT, sigquit_handler)
 
@@ -281,7 +281,7 @@ class PipelineTests(PipettorTestBase):
             return "^invalid stdio specification object type: <class 'float'> 3\\.14159$"
         else:
             return "^invalid stdio specification object type: <type 'float'> 3\\.14159$"
-        
+
     def testBogusStdin(self):
         # test stdin specification is not legal
         nopen = self.numOpenFiles()
