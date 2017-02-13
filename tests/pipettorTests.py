@@ -8,8 +8,10 @@ import signal
 import six
 if __name__ == '__main__':
     sys.path.insert(0, os.path.normpath(os.path.dirname(sys.argv[0])) + "/../src")
+    from testCaseBase import TestCaseBase, TestLogging
+else:
+    from .testCaseBase import TestCaseBase, TestLogging
 from pipettor import Pipeline, Popen, ProcessException, PipettorException, DataReader, DataWriter, File, run, runout, runlex, runlexout
-from .testCaseBase import TestCaseBase, TestLogging
 
 
 def sigquit_handler(signum, frame):
@@ -324,6 +326,15 @@ class PipelineTests(PipettorTestBase):
             Pipeline([("cat", "/dev/null"), ("cat", "/dev/null")], stdin=dw)
         pl1.shutdown()  # clean up unstarted process
         self.orphanChecks(nopen)
+
+    def testIntArg(self):
+        nopen = self.numOpenFiles()
+        inf = self.getInputFile("simple1.txt")
+        dr = DataReader()
+        pl = Pipeline(("head", -2), stdin=inf, stdout=dr)
+        pl.wait()
+        self.assertEqual(dr.data, "one\ntwo\n")
+        self.commonChecks(nopen, pl, "^head -2 <.+/input/simple1\\.txt >\\[DataReader\\]", isRe=True)
 
 
 class PopenTests(PipettorTestBase):
