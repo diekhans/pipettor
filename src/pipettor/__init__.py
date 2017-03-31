@@ -5,7 +5,7 @@ from __future__ import print_function
 import shlex
 from pipettor.exceptions import PipettorException, ProcessException
 from pipettor.devices import Dev, DataReader, DataWriter, File
-from pipettor.processes import Pipeline, Popen, setDefaultLogger, getDefaultLogger, setDefaultLogLevel, getDefaultLogLevel, _isstr
+from pipettor.processes import Pipeline, Popen, setDefaultLogger, getDefaultLogger, setDefaultLogLevel, getDefaultLogLevel, setDefaultLogging, _isstr
 
 __version__ = "0.1a1"
 
@@ -33,7 +33,7 @@ def run(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLevel=
     The logger argument can be the name of a logger or a logger object.  If
     none, default is user.
     """
-    Pipeline(cmds, stdin=stdin, stdout=stdout, stderr=stderr).wait()
+    Pipeline(cmds, stdin=stdin, stdout=stdout, stderr=stderr, logger=logger, logLevel=logLevel).wait()
 
 
 def runout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None):
@@ -74,7 +74,7 @@ def runlex(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLev
     The logger argument can be the name of a logger or a logger object.  If
     none, default is user.
     """
-    run(_lexcmds(cmds), stdin=stdin, stdout=stdout, stderr=stderr)
+    run(_lexcmds(cmds), stdin=stdin, stdout=stdout, stderr=stderr, logger=logger, logLevel=logLevel)
 
 
 def runlexout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None):
@@ -91,7 +91,7 @@ def runlexout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None):
     The logger argument can be the name of a logger or a logger object.  If
     none, default is user.
     """
-    return runout(_lexcmds(cmds), stdin=stdin, stderr=stderr)
+    return runout(_lexcmds(cmds), stdin=stdin, stderr=stderr, logger=logger, logLevel=logLevel)
 
 
 __all__ = (PipettorException.__name__, ProcessException.__name__,
@@ -99,4 +99,5 @@ __all__ = (PipettorException.__name__, ProcessException.__name__,
            File.__name__, Pipeline.__name__, Popen.__name__,
            setDefaultLogger.__name__, getDefaultLogger.__name__,
            setDefaultLogLevel.__name__, getDefaultLogLevel.__name__,
+           setDefaultLogging.__name__,
            run.__name__, runout.__name__, runlex.__name__, runlexout.__name__)

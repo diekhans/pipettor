@@ -72,6 +72,14 @@ def getDefaultLogLevel():
     return _defaultLogLevel
 
 
+def setDefaultLogging(logger, level):
+    """Set both default logger and level. Either can be None to leave as default"""
+    if logger is not None:
+        setDefaultLogger(logger)
+    if level is not None:
+        setDefaultLogLevel(level)
+
+
 def _getLoggerToUse(logger):
     """if logger is None, get default, otherwise if it's a string, look it up,
     otherwise it's the logger object."""
