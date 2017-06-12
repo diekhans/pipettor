@@ -60,7 +60,7 @@ Ready to contribute? Here's how to set up `pipettor` for local development.
 1. Fork the `pipettor` repo on GitHub.
 2. Clone your fork locally::
 
-    $ git clone git@github.com:your_name_here/pipettor.git
+    $ git clone git@github.com:diehkhans/pipettor.git
 
 3. Install your local copy into a virtualenv. Assuming you have virtualenvwrapper installed, this is how you set up your fork for local development::
 
@@ -76,9 +76,9 @@ Ready to contribute? Here's how to set up `pipettor` for local development.
 
 5. When you're done making changes, check that your changes pass flake8 and the tests, including testing other Python versions with tox::
 
-    $ flake8 pipettor tests
-    $ python setup.py test
-    $ tox
+    $ make lint
+    $ make test
+    $ make test-all
 
    To get flake8 and tox, just pip install them into your virtualenv.
 
