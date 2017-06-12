@@ -24,7 +24,7 @@ test_requirements = [
 
 setup(
     name = 'pipettor',
-    version = '0.1.1',
+    version = '0.1.2',
     description = "pipettor - robust, easy to use Unix process pipelines",
     long_description = readme + '\n\n' + history,
     author = "Mark Diekhans",
