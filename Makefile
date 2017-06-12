@@ -113,6 +113,6 @@ test-release-pip:
 	${envact} && python ../tests/pipettorTests.py
 
 release: clean
-	python setup.py sdist upload
-	python setup.py bdist_wheel upload
+	python setup.py sdist upload --repository=pypi
+	python setup.py bdist_wheel upload --repository=pypi
 

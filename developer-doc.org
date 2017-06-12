@@ -26,6 +26,8 @@ make test-release-pip
 
 
 * Release process:
+** one time setup:
+python setup.py register -r pypi
 ** do all of the above testing
 ** update HISTORY.rst
 ** commit to master
