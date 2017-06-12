@@ -1,33 +1,40 @@
-.PHONY: help clean clean-build clean-pyc clean-docs clean-tests lint test test-all coverage docs servedocs release dist install testpip
-define BROWSER_PYSCRIPT
-import os, webbrowser, sys
-try:
-	from urllib import pathname2url
-except:
-	from urllib.request import pathname2url
+# -*- mode: makefile-gmake  -*-
 
-webbrowser.open("file://" + pathname2url(os.path.abspath(sys.argv[1])))
-endef
-export BROWSER_PYSCRIPT
-BROWSER := python -c "$$BROWSER_PYSCRIPT"
+.PHONY: help clean clean-build clean-pyc clean-docs clean-tests \
+	lint test test-all coverage \
+	docs docs-open \
+	install \
+	dist test-pip \
+	test-release test-release-pip \
+	release
 
 testenv = testenv
 
+define envsetup
+	@rm -rf ${testenv}
+	mkdir -p ${testenv}
+	virtualenv --quiet ${testenv}
+endef
+envact = cd ${testenv} && source ./bin/activate
 
 help:
 	@echo "clean - remove all build, test, coverage and Python artifacts"
 	@echo "clean-build - remove build artifacts"
 	@echo "clean-pyc - remove Python file artifacts"
+	@echo "clean-docs - remove generated documentation"
 	@echo "clean-test - remove test and coverage artifacts"
 	@echo "lint - check style with flake8"
 	@echo "test - run tests quickly with the default Python"
 	@echo "test-all - run tests on every Python version with tox"
 	@echo "coverage - check code coverage quickly with the default Python"
 	@echo "docs - generate Sphinx HTML documentation, including API docs"
-	@echo "release - package and upload a release"
-	@echo "dist - package"
+	@echo "docs-open - gererate documents and open in web local browser"
 	@echo "install - install the package to the active Python's site-packages"
-	@echo "testpip - test install the package using pip"
+	@echo "dist - package"
+	@echo "test-pip - test install the package using pip"
+	@echo "test-release - test upload to pypitest"
+	@echo "test-release-pip - install from pypitest"
+	@echo "release - package and upload a release"
 
 clean: clean-build clean-pyc clean-test clean-docs
 
@@ -76,26 +83,36 @@ docs:
 	sphinx-apidoc -o docs/ src
 	$(MAKE) -C docs clean
 	$(MAKE) -C docs html
-	$(BROWSER) docs/_build/html/index.html
 
-servedocs: docs
-	watchmedo shell-command -p '*.rst' -c '$(MAKE) -C docs html' -R -D .
+docs-open: docs
+	open docs/_build/html/index.html
 
-release: clean
-	python setup.py sdist upload
-	python setup.py bdist_wheel upload
+install: clean
+	python setup.py install
 
 dist: clean
 	python setup.py sdist
 	python setup.py bdist_wheel
 	ls -l dist
 
-install: clean
-	python setup.py install
+# test install locally
+test-pip: dist
+	${envsetup}
+	${envact} && pip install --no-cache-dir ../dist/pipettor-*.tar.gz
+	${envact} && python ../tests/pipettorTests.py
 
-testpip: dist
-	@rm -rf ${testenv}
-	mkdir -p ${testenv}
-	virtualenv ${testenv}
-	(cd ${testenv} && source ./bin/activate && pip install --no-cache-dir ../dist/pipettor-*.tar.gz)
-	(cd ${testenv} && source ./bin/activate && python ../tests/pipettorTests.py)
+# test release to pypitest
+test-release: clean
+	python setup.py sdist upload --repository=pypitest
+	python setup.py bdist_wheel upload --repository=pypitest
+
+# test release install from pypitest
+test-release-pip:
+	${envsetup}
+	${envact} && pip install --no-cache-dir --index=https://testpypi.python.org/pypi pipettor
+	${envact} && python ../tests/pipettorTests.py
+
+release: clean
+	python setup.py sdist upload
+	python setup.py bdist_wheel upload
+
