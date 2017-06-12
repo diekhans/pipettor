@@ -24,7 +24,7 @@ test_requirements = [
 
 setup(
     name = 'pipettor',
-    version = '0.1.1',
+    version = '0.1.0',
     description = "pipettor - robust, easy to use Unix process pipelines",
     long_description = readme + '\n\n' + history,
     author = "Mark Diekhans",
@@ -33,22 +33,23 @@ setup(
     packages = [
         'pipettor',
     ],
-    package_dir = {'':
-                 'src'},
+    package_dir = {'': 'src'},
     include_package_data = True,
     install_requires = requirements,
     license = "MIT",
     zip_safe = True,
     keywords = ['process', 'pipe'],
     classifiers = [
-        'Development Status :: 2 - Pre-Alpha',
+        'Development Status :: 3 - Alpha',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
         'Natural Language :: English',
-        "Programming Language :: Python :: 2",
+        'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.6',
+        'Operating System :: POSIX',
+        'Operating System :: MacOS :: MacOS X',
         'Topic :: Software Development :: Libraries :: Python Modules'
     ],
     test_suite = 'tests',

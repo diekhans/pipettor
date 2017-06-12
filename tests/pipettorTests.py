@@ -17,6 +17,8 @@ from pipettor import Pipeline, Popen, ProcessException, PipettorException, DataR
 def sigquit_handler(signum, frame):
     " prevent MacOS  crash reporter"
     sys.exit(os.EX_SOFTWARE)
+
+
 signal.signal(signal.SIGQUIT, sigquit_handler)
 
 xrange = six.moves.builtins.range
@@ -501,6 +503,7 @@ def suite():
     ts.addTest(unittest.makeSuite(PopenTests))
     ts.addTest(unittest.makeSuite(FunctionTests))
     return ts
+
 
 if __name__ == '__main__':
     unittest.main()

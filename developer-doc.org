@@ -1,31 +1,36 @@
 * development testing
-** check code with fake8
+** check code with fake8:
 make lint
-** run tests with default python
+** run tests with default python:
 make test
-** run tests with all support python versions
+** run tests with all support python versions:
 make test-all
-** test install from local dist
+** test install from local dist:
 make test-pip
-** check test coverage
+** check test coverage:
 make coverage
-** build docs or build and open in browser (Mac OS/X only)
+** build docs:
 make docs
+** build docs and open in browser (Mac OS/X only):
 make docs-open
 
 * test pip with testpypi
-** one time setup
+** one time setup:
 python setup.py register -r pypitest
 
-** testing pip install using pypitest.  For retesting, either version must be bumped or project deleted and registered from pypitest
+** testing pip install using pypitest.  Must bump version for retesting:
 make test-release
 
 ** test release install from pypitest in virtualenv
 make test-release-pip
 
 
-* test readthedocs
-
-
 * Release process:
+** do all of the above testing
 ** update HISTORY.rst
+** commit to master
+** bumpversion major|minor|patch
+** make release
+** git push origin --tags
+** update readthedocs version
+** test release install
