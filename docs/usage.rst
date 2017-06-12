@@ -4,13 +4,13 @@
 Usage
 =====
 
-A single processes in pipettor are specified as sequence (list or tuple) of
+A single process in pipettor is specified as sequence (list or tuple) of
 the command and its arguments.  A process pipeline is specified as a sequence
 of such commands (lists of lists, lists of tuples, etc).
 Functions to create processes check if a specified command is a sequence of
 commands or a single command based on the sequence structure.
 
-Examples commands are::
+Example commands are::
 
    ("date",)
    ("sort", "-u", "/etc/stuff")
@@ -31,21 +31,21 @@ the :func:`pipettor.run` or :func:`pipettor.runout` functions::
     out = pipettor.runout([("sort", "-u", "/etc/hosts"), ("wc", "-l")])
 
     
-File line objects to or from a file maybe create using the
+File-like objects to or from a pipeline maybe create using the
 :class:`pipettor.Popen` class::
 
     import pipettor
     rfh = pipettor.Popen([("sort", "-u", "/etc/hosts"), ("wc", "-l")])
     wfh = pipettor.Popen([("sort", "-u"), ("wc", "-l")], "w", stdout="uniq.linecnt")
          
-Data can be also be written to pipelines using :class:`pipettor.DataWriter` objects::
+In-memory data can be also be written to pipelines using :class:`pipettor.DataWriter` objects::
 
     import pipettor
     dw = pipettor.DataWriter("line3\nline1\nline2\nline1\n")
     pipettor.run([("sort", "-u",), ("wc", "-l")], stdin=dw, stdout="writer.linecnt")
 
 
-Data can be read from pipelines using :class:`pipettor.DataReader` objects::
+Data can be read from pipelines into memory using :class:`pipettor.DataReader` objects::
 
     import pipettor
     dr = pipettor.DataReader()
