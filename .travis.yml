@@ -5,7 +5,7 @@ language: python
 
 env:
   - TOXENV=py27
-  - TOXENV=pypy
+  - TOXENV=py36
 
 # command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
 install: pip install -U tox
@@ -13,13 +13,3 @@ install: pip install -U tox
 # command to run tests, e.g. python setup.py test
 script: python setup.py test
 
-# After you create the Github repo and add it to Travis, run the
-# travis_pypi_setup.py script to finish PyPI deployment setup
-deploy:
-  provider: pypi
-  distributions: sdist bdist_wheel
-  user: diekhans
-  on:
-    tags: true
-    repo: diekhans/pipettor
-    condition: $TOXENV == py27
