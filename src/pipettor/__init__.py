@@ -2,15 +2,16 @@
 Robust, easy to use Unix process pipelines.
 """
 from __future__ import print_function
+import six
 import shlex
 from pipettor.exceptions import PipettorException, ProcessException
 from pipettor.devices import Dev, DataReader, DataWriter, File
-from pipettor.processes import Pipeline, Popen, setDefaultLogger, getDefaultLogger, setDefaultLogLevel, getDefaultLogLevel, setDefaultLogging, _isstr
+from pipettor.processes import Pipeline, Popen, setDefaultLogger, getDefaultLogger
 
-__version__ = "0.1.3"
+__version__ = "0.2.0"
 
 
-def run(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLevel=None):
+def run(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None):
     """Construct and run an process pipeline. If any of the processes fail,
     a ProcessException is throw.
 
@@ -30,13 +31,14 @@ def run(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLevel=
     :class:`pipettor.DataReader` is provided, the contents of stderr from all
     process will be included in the exception.
 
-    The logger argument can be the name of a logger or a logger object.  If
-    none, default is user.
+    The logger argument can be the name of a logger or a logger object.
+    Logging of process execution is done at INFO level and errors at ERROR
+    level.
     """
-    Pipeline(cmds, stdin=stdin, stdout=stdout, stderr=stderr, logger=logger, logLevel=logLevel).wait()
+    Pipeline(cmds, stdin=stdin, stdout=stdout, stderr=stderr, logger=logger).wait()
 
 
-def runout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None):
+def runout(cmds, stdin=None, stderr=DataReader, logger=None):
     """
     Construct and run an process pipeline, returning the output. If any of the
     processes fail, a ProcessException is throw.
@@ -44,23 +46,24 @@ def runout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None):
     See the :func:`pipettor.run` function for more details.  Use
     `str.splitlines()` to split result into lines.
 
-    The logger argument can be the name of a logger or a logger object.  If
-    none, default is user.
+    The logger argument can be the name of a logger or a logger object.
+    Logging of process execution is done at INFO level and errors at ERROR
+    level.
     """
     dr = DataReader()
-    Pipeline(cmds, stdin=stdin, stdout=dr, stderr=stderr, logger=logger, logLevel=logLevel).wait()
+    Pipeline(cmds, stdin=stdin, stdout=dr, stderr=stderr, logger=logger).wait()
     return dr.data
 
 
 def _lexcmds(cmds):
     """spit pipeline specification into arguments"""
-    if _isstr(cmds):
+    if isinstance(cmds, six.string_types):
         return shlex.split(cmds)
     else:
-        return [shlex.split(cmd) if _isstr(cmd) else cmd for cmd in cmds]
+        return [shlex.split(cmd) if isinstance(cmd, six.string_types) else cmd for cmd in cmds]
 
 
-def runlex(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLevel=None):
+def runlex(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None):
     """
     Call :func:`pipettor.run`, first splitting commands specified
     as strings are split into arguments using `shlex.split`.
@@ -71,13 +74,14 @@ def runlex(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLev
     into arguments to form commands.  Elements that are lists
     are treated as commands without splitting.
 
-    The logger argument can be the name of a logger or a logger object.  If
-    none, default is user.
+    The logger argument can be the name of a logger or a logger object.
+    Logging of process execution is done at INFO level and errors at ERROR
+    level.
     """
-    run(_lexcmds(cmds), stdin=stdin, stdout=stdout, stderr=stderr, logger=logger, logLevel=logLevel)
+    run(_lexcmds(cmds), stdin=stdin, stdout=stdout, stderr=stderr, logger=logger)
 
 
-def runlexout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None):
+def runlexout(cmds, stdin=None, stderr=DataReader, logger=None):
     """
     Call :func:`pipettor.runout`, first splitting commands specified
     as strings are split into arguments using `shlex.split`.
@@ -88,16 +92,15 @@ def runlexout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None):
     into arguments to form commands.  Elements that are lists
     are treated as commands without splitting.
 
-    The logger argument can be the name of a logger or a logger object.  If
-    none, default is user.
+    The logger argument can be the name of a logger or a logger object.
+    Logging of process execution is done at INFO level and errors at ERROR
+    level.
     """
-    return runout(_lexcmds(cmds), stdin=stdin, stderr=stderr, logger=logger, logLevel=logLevel)
+    return runout(_lexcmds(cmds), stdin=stdin, stderr=stderr, logger=logger)
 
 
 __all__ = (PipettorException.__name__, ProcessException.__name__,
            Dev.__name__, DataReader.__name__, DataWriter.__name__,
            File.__name__, Pipeline.__name__, Popen.__name__,
            setDefaultLogger.__name__, getDefaultLogger.__name__,
-           setDefaultLogLevel.__name__, getDefaultLogLevel.__name__,
-           setDefaultLogging.__name__,
            run.__name__, runout.__name__, runlex.__name__, runlexout.__name__)
