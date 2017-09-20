@@ -10,17 +10,17 @@ make test-pip
 ** check test coverage:
 make coverage
 ** build docs:
-make docs
-** build docs and open in browser (Mac OS/X only):
-make docs-open
+  make docs
+or on Mac OS/X
+  make docs-open  
 
 * test pip with testpypi
 ** one time setup:
 python setup.py register -r pypitest
 
+** bumpversion --allow-dirty major|minor|patch
 ** testing pip install using pypitest.  Must bump version for retesting:
 make test-release
-
 ** test release install from pypitest in virtualenv
 make test-release-pip
 
@@ -31,7 +31,6 @@ python setup.py register -r pypi
 ** do all of the above testing
 ** update HISTORY.rst
 ** commit to master
-** bumpversion major|minor|patch
 ** make release
 ** git push origin --tags
 ** update readthedocs version

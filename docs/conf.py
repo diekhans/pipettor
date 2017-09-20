@@ -101,7 +101,7 @@ pygments_style = 'sphinx'
 
 # A list of ignored prefixes for module index sorting.
 #modindex_common_prefix = []
-
+ 
 # If true, keep warnings as "system message" paragraphs in the built
 # documents.
 #keep_warnings = False
@@ -170,7 +170,7 @@ html_static_path = []
 #html_split_index = False
 
 # If true, links to the reST sources are added to the pages.
-#html_show_sourcelink = True
+html_show_sourcelink = False
 
 # If true, "Created using Sphinx" is shown in the HTML footer.
 # Default is True.

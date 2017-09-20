@@ -10,6 +10,9 @@
 
 testenv = testenv
 
+pypi_url = https://upload.pypi.org/simple/
+pypitest_url = https://test.pypi.org/simple/
+
 define envsetup
 	@rm -rf ${testenv}
 	mkdir -p ${testenv}
@@ -102,17 +105,15 @@ test-pip: dist
 	${envact} && python ../tests/pipettorTests.py
 
 # test release to pypitest
-test-release: clean
-	python setup.py sdist upload --repository=pypitest
-	python setup.py bdist_wheel upload --repository=pypitest
+test-release: dist
+	twine upload --repository=pypitest dist/pipettor-*.whl dist/pipettor-*.tar.gz
 
 # test release install from pypitest
 test-release-pip:
 	${envsetup}
-	${envact} && pip install --no-cache-dir --index=https://testpypi.python.org/pypi pipettor
+	${envact} && pip install --no-cache-dir --index-url=${pypitest_url} pipettor
 	${envact} && python ../tests/pipettorTests.py
 
-release: clean
-	python setup.py sdist upload --repository=pypi
-	python setup.py bdist_wheel upload --repository=pypi
+release: dist
+	twine upload --repository=pypi dist/pipettor-*.whl dist/pipettor-*.tar.gz
 

@@ -1,5 +1,5 @@
 ===============================
-pipettor
+Pipettor Overview
 ===============================
 
 pipettor - robust, easy to use Python package for running Unix process pipelines
@@ -19,6 +19,6 @@ Features
 * Asynchronous reading and writing to and from the pipeline maybe done without risk of
   deadlock.
 * Pipeline can run asynchronously or block until completion.
-* File-like objects maybe created for reading or writing a pipeline.
+* File-like objects for reading or writing a pipeline.
 * Documentation: https://pipettor.readthedocs.org.
 

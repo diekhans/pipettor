@@ -5,7 +5,7 @@ from __future__ import print_function
 import six
 import shlex
 from pipettor.exceptions import PipettorException, ProcessException
-from pipettor.devices import Dev, DataReader, DataWriter, File
+from pipettor.devices import DataReader, DataWriter, File
 from pipettor.processes import Pipeline, Popen, setDefaultLogger, getDefaultLogger
 
 __version__ = "0.2.0"
@@ -99,8 +99,10 @@ def runlexout(cmds, stdin=None, stderr=DataReader, logger=None):
     return runout(_lexcmds(cmds), stdin=stdin, stderr=stderr, logger=logger)
 
 
+# n.b. all of the library API functions and classes need to be explicitly
+# included in the docs/library.rst files
 __all__ = (PipettorException.__name__, ProcessException.__name__,
-           Dev.__name__, DataReader.__name__, DataWriter.__name__,
+           DataReader.__name__, DataWriter.__name__,
            File.__name__, Pipeline.__name__, Popen.__name__,
            setDefaultLogger.__name__, getDefaultLogger.__name__,
            run.__name__, runout.__name__, runlex.__name__, runlexout.__name__)

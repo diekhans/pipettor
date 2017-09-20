@@ -8,16 +8,17 @@ Contents:
 =========
 
 .. toctree::
-   :maxdepth: 2
+   :titlesonly:
+   :maxdepth: 1
 
    readme
    installation
    usage
-   modules
    library
    contributing
    authors
    history
+   modules
 
 Indices and tables
 ==================

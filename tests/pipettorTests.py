@@ -116,8 +116,10 @@ class PipelineTests(PipettorTestBase):
         with six.assertRaisesRegex(self, ProcessException, "^process exited 1: false$"):
             pl.wait()
         self.commonChecks(nopen, pl, "false | true 2>[DataReader]")
-        self.assertEqual(log.data, """start: false | true 2>[DataReader]\n"""
-                         """failure: false | true 2>[DataReader]: process exited 1: false\n""")
+        six.assertRegex(self, log.data,
+                        re.compile("""^start: false | true 2>[DataReader]\n"""
+                                   """failure: false | true 2>[DataReader]: process exited 1: false\n.*""",
+                                   re.MULTILINE))
 
     def testPipeFailStderr(self):
         nopen = self.numOpenFiles()

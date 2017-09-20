@@ -3,6 +3,7 @@
 Robust, easy to use Unix process pipelines.
 """
 from __future__ import print_function
+import six
 import os
 import sys
 import signal
@@ -10,7 +11,6 @@ import gc
 import errno
 import pipes
 import logging
-import six
 from pipettor.devices import _validate_mode
 from pipettor.devices import Dev
 from pipettor.devices import DataReader
@@ -33,18 +33,12 @@ except:
     MAXFD = 256
 
 
-def _isstr(s):
-    "py 2/3 compatible check for a string"
-    return isinstance(s, str) or (six.PY2 and isinstance(s, unicode))
-
-
 class _SetpgidCompleteMsg(object):
     "message sent to by first process to indicate that setpgid is complete"
     pass
 
 
 _defaultLogger = None
-_defaultLogLevel = logging.DEBUG
 
 
 def setDefaultLogger(logger):
@@ -60,26 +54,6 @@ def getDefaultLogger():
     return _defaultLogger
 
 
-def setDefaultLogLevel(level):
-    """Set the default pipettor log level to use in logging command and errors.
-    Standard value is logging.DEBUG"""
-    global _defaultLogLevel
-    _defaultLogLevel = level
-
-
-def getDefaultLogLevel():
-    """Get the default pipettor log level to use in logging command and errors."""
-    return _defaultLogLevel
-
-
-def setDefaultLogging(logger, level):
-    """Set both default logger and level. Either can be None to leave as default"""
-    if logger is not None:
-        setDefaultLogger(logger)
-    if level is not None:
-        setDefaultLogLevel(level)
-
-
 def _getLoggerToUse(logger):
     """if logger is None, get default, otherwise if it's a string, look it up,
     otherwise it's the logger object."""
@@ -89,11 +63,6 @@ def _getLoggerToUse(logger):
         return logging.getLogger(logger)
     else:
         return logger
-
-
-def _getLogLevelToUse(logLevel):
-    "get log level to use, either what is specified or default"
-    return logLevel if logLevel is not None else getDefaultLogLevel()
 
 
 class Process(object):
@@ -166,7 +135,7 @@ class Process(object):
             return spec  # passed unchanged
         elif callable(getattr(spec, "fileno", None)):
             return spec.fileno()  # is file-like
-        elif _isstr(spec):
+        elif isinstance(spec, six.string_types):
             return File(spec, mode)
         else:
             raise PipettorException("invalid stdio specification object type: {} {}".format(type(spec), spec))
@@ -376,14 +345,14 @@ class Pipeline(object):
     A process pipeline.  Once constructed, the pipeline
     is started with start(), poll(), or wait() functions.
 
-    Cmds is either a list of arguments for a single process, or a list of such
-    lists for a pipeline. If the stdin/out/err arguments are none, the
-    open files are are inherited.  Otherwise they can be string file
-    names, file-like objects, file number, or Dev object.  Stdin is input
-    to the first process, stdout is output to the last process and stderr
-    is attached to all processed. DataReader and DataWriter objects can be
-    specified for stdin/out/err asynchronously I/O with the pipeline
-    without the danger of deadlock.
+    The cmds argument is either a list of arguments for a single process, or a
+    list of such lists for a pipeline. If the stdin/out/err arguments are
+    none, the open files are are inherited.  Otherwise they can be string file
+    names, file-like objects, file number, or Dev object.  Stdin is input to
+    the first process, stdout is output to the last process and stderr is
+    attached to all processed. DataReader and DataWriter objects can be
+    specified for stdin/out/err asynchronously I/O with the pipeline without
+    the danger of deadlock.
 
     If stderr is the class DataReader, a new instance is created for each
     process in the pipeline. The contents of stderr will include an
@@ -396,8 +365,7 @@ class Pipeline(object):
     The logger argument can be the name of a logger or a logger object.  If
     none, default is user.
     """
-    def __init__(self, cmds, stdin=None, stdout=None, stderr=DataReader,
-                 logger=None, logLevel=None):
+    def __init__(self, cmds, stdin=None, stdout=None, stderr=DataReader, logger=None):
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
@@ -409,7 +377,6 @@ class Pipeline(object):
         self.running = False   # processes are running (or wait has not been called)
         self.finished = False  # have all processes finished
         self.logger = _getLoggerToUse(logger)
-        self.logLevel = _getLogLevelToUse(logLevel)
 
         if isinstance(cmds[0], str):
             cmds = [cmds]  # one-process pipeline
@@ -426,6 +393,23 @@ class Pipeline(object):
         for cmd in cmds:
             ncmds.append([str(a) for a in cmd])
         return ncmds
+
+    @staticmethod
+    def __getLogKwargs(ex):
+        kwargs = {}
+        if ex is not None:
+            if six.PY2:
+                # need to just get some stack track for 2.7
+                kwargs["exc_info"] = (type(ex), ex, sys.exc_info()[2])
+            else:
+                kwargs["exc_info"] = ex
+        return kwargs
+
+    def _log(self, level, message, ex=None):
+        """If logging is available and enabled, log message and optional
+        exception"""
+        if (self.logger is not None) and (self.logger.isEnabledFor(level)):
+            self.logger.log(level, "{}: {}".format(message, str(self)), **self.__getLogKwargs(ex))
 
     def __setup_processes(self, cmds):
         prevPipe = None
@@ -508,12 +492,10 @@ class Pipeline(object):
         self.running = False
         for d in self.devs:
             d.close()
-        if self.logger is not None:
-            self.logger.log(self.logLevel, "success: {}".format(str(self)))
+        self._log(logging.INFO, "success")
 
     def __log_failure(self, ex):
-        if self.logger is not None:
-            self.logger.log(self.logLevel, "failure: {}: {}".format(str(self), str(ex)))
+        self._log(logging.ERROR, "failure", ex)
 
     def __error_cleanup_dev(self, dev):
         try:
@@ -538,8 +520,7 @@ class Pipeline(object):
 
     def start(self):
         """start processes"""
-        if self.logger is not None:
-            self.logger.log(self.logLevel, "start: {}".format(str(self)))
+        self._log(logging.INFO, "start")
         self.started = True
         self.running = True
         # clean up devices and process if there is a failure
@@ -638,29 +619,28 @@ class Pipeline(object):
 class Popen(Pipeline):
     """File-like object of processes to read from or write to a Pipeline.
 
-    .. automethod:: __init__
-    """
+    The cmds argument is either a list of arguments for a single process, or a
+    list of such lists for a pipeline.  Mode is 'r' for a pipeline who's
+    output will be read, or 'w' for a pipeline to that is to have data written
+    to it.  If stdin or stdout is specified, and is a string, it is a file to
+    open as other file at the other end of the pipeline.  If it's not a
+    string, it is assumed to be a file object to use for input or output.  For
+    a read pipe, only stdin can be specified, for a write pipe, only stdout
+    can be used.
 
-    def __init__(self, cmds, mode='r', stdin=None, stdout=None, logger=None, logLevel=None):
-        """cmds is either a list of arguments for a single process, or a list of such
-        lists for a pipeline.  Mode is 'r' for a pipeline who's output will be
-        read, or 'w' for a pipeline to that is to have data written to it.  If
-        stdin or stdout is specified, and is a string, it is a file to open as other
-        file at the other end of the pipeline.  If it's not a string, it is
-        assumed to be a file object to use for input or output.  For a read pipe,
-        only stdin can be specified, for a write pipe, only stdout can be used.
+    read pipeline ('r'):
+      stdin --> cmd[0] --> ... --> cmd[n] --> Popen
 
-        read pipeline ('r'):
-          stdin --> cmd[0] --> ... --> cmd[n] --> Popen
+    write pipeline ('w')
+      Popen --> cmd[0] --> ... --> cmd[n] --> stdout
 
-        write pipeline ('w')
-          Popen --> cmd[0] --> ... --> cmd[n] --> stdout
+    Command arguments will be converted to strings.
 
-        Command arguments will be converted to strings.
-
-        The logger argument can be the name of a logger or a logger object.  If
-        none, default is user.
+    The logger argument can be the name of a logger or a logger object.
+    Logging of process execution is done at INFO level and errors at ERROR
+    level.
         """
+    def __init__(self, cmds, mode='r', stdin=None, stdout=None, logger=None):
         self.mode = mode
         self.__parent_fh = None
         self.__child_fd = None
@@ -683,7 +663,7 @@ class Popen(Pipeline):
             lastOut = stdout
             self.__child_fd = pipe_read_fd
             self.__parent_fh = os.fdopen(pipe_write_fd, mode)
-        super(Popen, self).__init__(cmds, stdin=firstIn, stdout=lastOut, logger=logger, logLevel=logLevel)
+        super(Popen, self).__init__(cmds, stdin=firstIn, stdout=lastOut, logger=logger,)
         self.start()
         os.close(self.__child_fd)
         self.__child_fd = None

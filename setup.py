@@ -40,7 +40,7 @@ setup(
     zip_safe = True,
     keywords = ['process', 'pipe'],
     classifiers = [
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
         'Natural Language :: English',
