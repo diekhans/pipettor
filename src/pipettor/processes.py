@@ -106,10 +106,7 @@ class Process(object):
 
     def __str__(self):
         "get simple description of process"
-        strs = []
-        for arg in self.cmd:
-            strs.append(pipes.quote(str(arg)))
-        return " ".join(strs)
+        return " ".join([pipes.quote(str(arg)) for arg in self.cmd])
 
     def __wrapProcessException(self, cause):
         """wrap in ProcessException without losing causing exception, on Py3, use
