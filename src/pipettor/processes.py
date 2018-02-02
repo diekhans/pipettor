@@ -665,7 +665,7 @@ class Popen(Pipeline):
         self.__parent_fh = None
         self.__child_fd = None
         _validate_mode(mode, allow_append=False)
-        if mode == "r":
+        if mode[0] == "r":
             if stdout is not None:
                 raise PipettorException("can not specify stdout with read mode")
         else:
@@ -673,7 +673,7 @@ class Popen(Pipeline):
                 raise PipettorException("can not specify stdin with write mode")
 
         pipe_read_fd, pipe_write_fd = os.pipe()
-        if mode == "r":
+        if mode[0] == "r":
             firstIn = stdin
             lastOut = pipe_write_fd
             self.__child_fd = pipe_write_fd
