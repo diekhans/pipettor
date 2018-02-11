@@ -1,0 +1,3 @@
+* more extensive encoding tests
+* thread safety after open
+* change __ to _ in most cases

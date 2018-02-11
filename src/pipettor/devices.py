@@ -3,6 +3,7 @@
 pipettor interfaces to files and pipes, as well as some other IPC stuff.
 """
 from __future__ import print_function
+import six
 import os
 import re
 import fcntl
@@ -35,6 +36,16 @@ def _validate_mode(mode, allow_append):
         raise PipettorException("invalid mode: '{}', expected {} with optional 'b' suffix".format(mode, expect))
 
 
+def _open_compat(fd_or_path, mode, buffering=-1, encoding=None, errors=None):
+    """PY2/3 compatibility wrapper for open/fdopen"""
+    if six.PY3:
+        return open(fd_or_path, mode, buffering=buffering, encoding=encoding, errors=errors)
+    elif isinstance(fd_or_path, int):
+        return os.fdopen(fd_or_path, mode, buffering)
+    else:
+        return open(fd_or_path, mode, buffering)
+
+
 class Dev(object):
     """Base class for objects specifying process input or output.  They
     provide a way of hide details of setting up interprocess
@@ -45,9 +56,6 @@ class Dev(object):
        read_fh - file object for reading
        write_fd - file integer descriptor for writing
        write_fh - file object for writing"""
-
-    def __init__(self, binary):
-        self.binary = binary
 
     def _bind_read_to_process(self, process):
         """associate read side with child process."""
@@ -87,19 +95,19 @@ class DataReader(Dev):
     pipeline.
 
     For Python3, specifying binary results in data of type bytes, otherwise
-    str.
+    str.  The buffering, encoding, and errors arguments are as used in the
+    Python 3 open() function.  With Python 2, encoding and error is ignored.
     """
-    def __init__(self, binary=False):
-        super(DataReader, self).__init__(binary)
-        read_fd, self.write_fd = os.pipe()
-        self.read_fh = os.fdopen(read_fd, "rb" if binary else "r")
+    def __init__(self, binary=False, buffering=-1, encoding=None, errors=None):
+        super(DataReader, self).__init__()
+        self.binary = binary
         self.__process = None
         self.__buffer = []
         self.__thread = None
-
-    def __del__(self):
-        "finalizer"
-        self.close()
+        self.read_fh = self.write_fd = None
+        read_fd, self.write_fd = os.pipe()
+        mode = "rb" if binary else "r"
+        self.read_fh = _open_compat(read_fd, mode, buffering, encoding, errors)
 
     def __str__(self):
         return "[DataReader]"
@@ -154,20 +162,23 @@ class DataReader(Dev):
 class DataWriter(Dev):
     """Object to asynchronously write data to process from memory via a pipe.  A
     thread is use to prevent deadlock when both reading and writing to a child
-    pipeline.
+    pipeline.  Text or binary output is determined by the type of data.
+
+    For Python3, binary results in data of type bytes, otherwise str.  The
+    buffering, encoding, and errors arguments are as used in the Python 3
+    open() function. With Python 2, encoding and error is ignored.
     """
 
-    def __init__(self, data):
-        super(DataWriter, self).__init__(False if isinstance(data, str) else True)
+    def __init__(self, data, buffering=-1, encoding=None, errors=None):
+        super(DataWriter, self).__init__()
+        binary = not isinstance(data, six.string_types)
         self.__data = data
-        self.read_fd, write_fd = os.pipe()
-        self.write_fh = os.fdopen(write_fd, "wb" if self.binary else "w")
         self.__thread = None
         self.__process = None
-
-    def __del__(self):
-        "finalizer"
-        self.close()
+        self.read_fd = self.write_fh = None
+        self.read_fd, write_fd = os.pipe()
+        mode = "wb" if binary else "w"
+        self.write_fh = _open_compat(write_fd, mode, buffering, encoding, errors)
 
     def __str__(self):
         return "[DataWriter]"
@@ -221,17 +232,14 @@ class DataWriter(Dev):
 
 class File(Dev):
     """A file path for input or output, used for specifying stdio associated
-    with files."""
+    with files. Mode starts with standard r, w, or a"""
 
     def __init__(self, path, mode="r"):
-        """constructor, mode is standard r,w, or a with, include b for
-        binary data"""
-        super(File, self).__init__(mode.find("b") >= 0)
+        super(File, self).__init__()
         self.__path = path
         self.__mode = mode
         # only one of the file descriptors is ever opened
         self.read_fd = self.write_fd = None
-        # must follow setting *_fd fields for __del__
         _validate_mode(mode, allow_append=True)
         if self.__mode[0] == 'r':
             self.read_fd = os.open(self.__path, os.O_RDONLY)
@@ -239,9 +247,6 @@ class File(Dev):
             self.write_fd = os.open(self.__path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o666)
         else:
             self.write_fd = os.open(self.__path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o666)
-
-    def __del__(self):
-        self.close()
 
     def __str__(self):
         return self.__path
@@ -264,13 +269,9 @@ class _SiblingPipe(Dev):
     """Interprocess communication between two child process by anonymous
     pipes."""
 
-    def __init__(self, binary=False):
-        super(_SiblingPipe, self).__init__(binary)
+    def __init__(self):
+        super(_SiblingPipe, self).__init__()
         self.read_fd, self.write_fd = os.pipe()
-
-    def __del__(self):
-        "finalizer"
-        self.close()
 
     def __str__(self):
         return "[Pipe]"
@@ -298,11 +299,11 @@ class _StatusPipe(object):
 
     def __init__(self):
         read_fd, write_fd = os.pipe()
-        self.read_fh = os.fdopen(read_fd, "rb")
-        self.write_fh = os.fdopen(write_fd, "wb")
+        self.read_fh = _open_compat(read_fd, "rb")
+        self.write_fh = _open_compat(write_fd, "wb")
         try:
             self.__set_close_on_exec(self.write_fh)
-        except:
+        except BaseException:
             self.close()
             raise
 
@@ -310,9 +311,6 @@ class _StatusPipe(object):
     def __set_close_on_exec(fh):
         flags = fcntl.fcntl(fh.fileno(), fcntl.F_GETFD)
         fcntl.fcntl(fh.fileno(), fcntl.F_SETFD, flags | fcntl.FD_CLOEXEC)
-
-    def __del__(self):
-        self.close()
 
     def close(self):
         "close pipes if open"

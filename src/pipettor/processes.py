@@ -12,6 +12,7 @@ import pipes
 import logging
 import six
 from pipettor.devices import _validate_mode
+from pipettor.devices import _open_compat
 from pipettor.devices import Dev
 from pipettor.devices import DataReader
 from pipettor.devices import _SiblingPipe
@@ -29,13 +30,8 @@ xrange = six.moves.builtins.range
 
 try:
     MAXFD = os.sysconf("SC_OPEN_MAX")
-except:
+except ValueError:
     MAXFD = 256
-
-
-def _isstr(s):
-    "py 2/3 compatible check for a string"
-    return isinstance(s, str) or (six.PY2 and isinstance(s, unicode))
 
 
 class _SetpgidCompleteMsg(object):
@@ -52,7 +48,7 @@ def setDefaultLogger(logger):
     If None, there is no default logging.  The logger can be the name of
     a logger or the logger itself.  Standard value is None"""
     global _defaultLogger
-    _defaultLogger = logging.getLogger(logger) if isinstance(logger, str) else logger
+    _defaultLogger = logging.getLogger(logger) if isinstance(logger, six.string_types) else logger
 
 
 def getDefaultLogger():
@@ -85,7 +81,7 @@ def _getLoggerToUse(logger):
     otherwise it's the logger object."""
     if logger is None:
         return _defaultLogger
-    elif isinstance(logger, str):
+    elif isinstance(logger, six.string_types):
         return logging.getLogger(logger)
     else:
         return logger
@@ -166,7 +162,7 @@ class Process(object):
             return spec  # passed unchanged
         elif callable(getattr(spec, "fileno", None)):
             return spec.fileno()  # is file-like
-        elif _isstr(spec):
+        elif isinstance(spec, six.string_types):
             return File(spec, mode)
         else:
             raise PipettorException("invalid stdio specification object type: {} {}".format(type(spec), spec))
@@ -196,7 +192,7 @@ class Process(object):
             try:
                 if fd not in keepOpen:
                     os.close(fd)
-            except:
+            except OSError:
                 pass
 
     def __child_set_signals(self):
@@ -279,10 +275,9 @@ class Process(object):
         gc.disable()
         try:
             self.pid = os.fork()
-        except:
+        finally:
             if gc_was_enabled:
                 gc.enable()
-            raise
         if self.pid == 0:
             self.__child_start()
         else:
@@ -292,7 +287,7 @@ class Process(object):
         "start the process,, if pgid is do group leader setup"
         try:
             self.__start_processes(pgid)
-        except:
+        except BaseException:
             self.exceptinfo = sys.exc_info()
         if self.exceptinfo is not None:
             self._raise_if_failed()
@@ -411,12 +406,12 @@ class Pipeline(object):
         self.logger = _getLoggerToUse(logger)
         self.logLevel = _getLogLevelToUse(logLevel)
 
-        if isinstance(cmds[0], str):
+        if isinstance(cmds[0], six.string_types):
             cmds = [cmds]  # one-process pipeline
         cmds = self.__stringify(cmds)
         try:
             self.__setup_processes(cmds)
-        except:
+        except BaseException:
             self.__error_cleanup()
             raise
 
@@ -446,7 +441,7 @@ class Pipeline(object):
             outPipe = stdout = _SiblingPipe()
         try:
             self.__create_process(cmd, stdin, stdout, stderr)
-        except:
+        except BaseException:
             if outPipe is not None:
                 outPipe.close()
             raise
@@ -576,7 +571,7 @@ class Pipeline(object):
             self.start()
         try:
             return self.__poll()
-        except:
+        except BaseException:
             self.__error_cleanup()
             raise
 
@@ -638,29 +633,34 @@ class Pipeline(object):
 class Popen(Pipeline):
     """File-like object of processes to read from or write to a Pipeline.
 
-    .. automethod:: __init__
+    The cmds argument is either a list of arguments for a single process,
+    or a list of such lists for a pipeline.  Mode is 'r' for a pipeline
+    who's output will be read, or 'w' for a pipeline to that is to have
+    data written to it.  If stdin or stdout is specified, and is a string,
+    it is a file to open as other file at the other end of the pipeline.
+    If it's not a string, it is assumed to be a file object to use for
+    input or output.  For a read pipe, only stdin can be specified, for a
+    write pipe, only stdout can be used.
+
+    read pipeline ('r'):
+      stdin --> cmd[0] --> ... --> cmd[n] --> Popen
+
+    write pipeline ('w')
+      Popen --> cmd[0] --> ... --> cmd[n] --> stdout
+
+    Command arguments will be converted to strings.
+
+    The logger argument can be the name of a logger or a logger object.  If
+    none, default is user.
+
+    For Python3, specifying binary access results in data of type bytes,
+    otherwise str.  The buffering, encoding, and errors arguments are as used
+    in the Python 3 open() function.  With Python 2, encoding and error is
+    ignored.
     """
 
-    def __init__(self, cmds, mode='r', stdin=None, stdout=None, logger=None, logLevel=None):
-        """cmds is either a list of arguments for a single process, or a list of such
-        lists for a pipeline.  Mode is 'r' for a pipeline who's output will be
-        read, or 'w' for a pipeline to that is to have data written to it.  If
-        stdin or stdout is specified, and is a string, it is a file to open as other
-        file at the other end of the pipeline.  If it's not a string, it is
-        assumed to be a file object to use for input or output.  For a read pipe,
-        only stdin can be specified, for a write pipe, only stdout can be used.
-
-        read pipeline ('r'):
-          stdin --> cmd[0] --> ... --> cmd[n] --> Popen
-
-        write pipeline ('w')
-          Popen --> cmd[0] --> ... --> cmd[n] --> stdout
-
-        Command arguments will be converted to strings.
-
-        The logger argument can be the name of a logger or a logger object.  If
-        none, default is user.
-        """
+    def __init__(self, cmds, mode='r', stdin=None, stdout=None, logger=None, logLevel=None,
+                 buffering=-1, encoding=None, errors=None):
         self.mode = mode
         self.__parent_fh = None
         self.__child_fd = None
@@ -677,19 +677,16 @@ class Popen(Pipeline):
             firstIn = stdin
             lastOut = pipe_write_fd
             self.__child_fd = pipe_write_fd
-            self.__parent_fh = os.fdopen(pipe_read_fd, mode)
+            self.__parent_fh = _open_compat(pipe_read_fd, mode, buffering=buffering, encoding=encoding, errors=errors)
         else:
             firstIn = pipe_read_fd
             lastOut = stdout
             self.__child_fd = pipe_read_fd
-            self.__parent_fh = os.fdopen(pipe_write_fd, mode)
+            self.__parent_fh = _open_compat(pipe_write_fd, mode, buffering=buffering, encoding=encoding, errors=errors)
         super(Popen, self).__init__(cmds, stdin=firstIn, stdout=lastOut, logger=logger, logLevel=logLevel)
         self.start()
         os.close(self.__child_fd)
         self.__child_fd = None
-
-    def __del__(self):
-        self.__close()
 
     def __close(self):
         if self.__parent_fh is not None:
