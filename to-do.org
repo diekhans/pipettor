@@ -1,3 +1,5 @@
 * more extensive encoding tests
 * thread safety after open
 * change __ to _ in most cases
+* Gencode rsl STAR runs still hang on control-C
+* is Processed.force really useful?

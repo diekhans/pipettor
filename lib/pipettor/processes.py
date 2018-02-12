@@ -11,6 +11,7 @@ import errno
 import pipes
 import logging
 import six
+from threading import RLock
 from pipettor.devices import _validate_mode
 from pipettor.devices import _open_compat
 from pipettor.devices import Dev
@@ -114,6 +115,7 @@ class Process(object):
     """
 
     def __init__(self, cmd, stdin=None, stdout=None, stderr=None):
+        self.lock = RLock()
         self.cmd = tuple(cmd)
         # stdio and argument Dev association
         self.stdin = self._stdio_assoc(stdin, "r")
@@ -306,7 +308,8 @@ class Process(object):
 
     def running(self):
         "determined if this process has been started, but not finished"
-        return self.started and not self.finished
+        with self.lock:
+            return self.started and not self.finished
 
     def _raise_if_failed(self):
         """raise exception if one is saved, otherwise do nothing"""
@@ -339,31 +342,35 @@ class Process(object):
             self._handle_error_exit()
         self.status_pipe.close()
 
-    def poll(self):
-        """Check if the process has completed.  Return True if it
-        has, False if it hasn't."""
-        if self.finished:
-            return True
-        w = os.waitpid(self.pid, os.WNOHANG)
+    def _waitpid(self, flag=0):
+        "Do waitpid and handle exit if finished, return True if finished"
+        w = os.waitpid(self.pid, flag)
         if w[0] != 0:
             self._handle_exit(w[1])
         return (w[0] != 0)
+
+    def poll(self):
+        """Check if the process has completed.  Return True if it
+        has, False if it hasn't."""
+        with self.lock:
+            if self.finished:
+                return True
+            return self._waitpid(os.WNOHANG)
 
     def _force_finish(self):
         """Force termination of process.  The forced flag is set, as an
         indication that this was not a primary failure in the pipeline.
         """
-        if self.started and not self.finished:
+        with self.lock:
             # check if finished before killing
-            if not self.poll():
+            if self.started and not self.poll():
                 self.forced = True
                 os.kill(self.pid, signal.SIGKILL)
-                w = os.waitpid(self.pid, 0)
-                self._handle_exit(w[1])
+                self._waitpid()
 
     def failed(self):
         "check if process failed, call after poll() or wait()"
-        return (self.exceptinfo is not None)
+        return self.exceptinfo is not None
 
 
 class Pipeline(object):
@@ -393,6 +400,7 @@ class Pipeline(object):
     """
     def __init__(self, cmds, stdin=None, stdout=None, stderr=DataReader,
                  logger=None, logLevel=None):
+        self.lock = RLock()
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
@@ -484,7 +492,7 @@ class Pipeline(object):
         if self.pgid is None:
             self.pgid = proc.pgid
 
-    def _start(self):
+    def _start_processes(self):
         for proc in self.procs:
             self._start_process(proc)
 
@@ -531,15 +539,14 @@ class Pipeline(object):
         for p in self.procs:
             self._error_cleanup_process(p)
 
-    def start(self):
-        """start processes"""
+    def _start_guts(self):
         if self.logger is not None:
             self.logger.log(self.logLevel, "start: {}".format(str(self)))
         self.started = True
         self.running = True
         # clean up devices and process if there is a failure
         try:
-            self._start()
+            self._start_processes()
             self._post_fork_parent()
             self._exec_barrier()
             self._post_exec_parent()
@@ -547,6 +554,13 @@ class Pipeline(object):
             self._log_failure(ex)
             self._error_cleanup()
             raise
+
+    def start(self):
+        """start processes"""
+        if self.started:
+            raise PipettorException("Pipeline is already been started")
+        with self.lock:
+            self._start_guts()
 
     def _raise_if_failed(self):
         """raise exception if any process has one, otherwise do nothing"""
@@ -557,7 +571,7 @@ class Pipeline(object):
             self._log_failure(ex)
             raise
 
-    def _poll(self):
+    def _poll_guts(self):
         for p in self.procs:
             if not p.poll():
                 return False
@@ -567,13 +581,14 @@ class Pipeline(object):
     def poll(self):
         """Check if all of the processes have completed.  Return True if it
         has, False if it hasn't."""
-        if not self.started:
-            self.start()
-        try:
-            return self._poll()
-        except BaseException:
-            self._error_cleanup()
-            raise
+        with self.lock:
+            if not self.started:
+                self.start()
+            try:
+                return self._poll_guts()
+            except BaseException:
+                self._error_cleanup()
+                raise
 
     def _wait_on_one(self):
         "wait on the next process in group to complete, return False if no more"
@@ -583,28 +598,36 @@ class Pipeline(object):
             if ex.errno == errno.ECHILD:
                 return False
             raise
-        p = self.bypid[w[0]]
-        p._handle_exit(w[1])
+        self.bypid[w[0]]._handle_exit(w[1])
         return True
 
-    def _wait(self):
-        while self._wait_on_one():
-            pass
-
-    def wait(self):
-        """Wait for all of the process to complete. Generate an exception if
-        any exits non-zero or signals. Starts process if not already
-        running."""
+    def _wait_guts(self):
         if not self.started:
             self.start()
         try:
-            self._wait()
+            while self._wait_on_one():
+                pass
         except Exception as ex:
             self._log_failure(ex)
             self._error_cleanup()
             raise
         self._raise_if_failed()
-        self._finish()
+
+    def wait(self):
+        """Wait for all of the process to complete. Generate an exception if
+        any exits non-zero or signals. Starts process if not already
+        running."""
+        with self.lock:
+            self._wait_guts()
+            self._finish()
+
+    def _shutdown(self):
+        "guts of shutdown"
+        self.kill(sig=signal.SIGKILL)
+        try:
+            self.wait()
+        except PipettorException:
+            pass  # ignore errors we report
 
     def shutdown(self):
         """Close down the pipeline prematurely. If the pipeline is running,
@@ -612,18 +635,21 @@ class Pipeline(object):
         differs from wait in the fact that it doesn't start the pipeline if it
         has not been started, just frees up open pipes. Primary intended
         for error recovery"""
-        # FIXME: need to restructure some of these functions
-        if self.running:
-            self._error_cleanup()
-        else:
-            self._finish()
+        with self.lock:
+            if self.logger is not None:
+                self.logger.log(self.logLevel, "Shutting down pipeline: {}".format(str(self)))
+            if self.running:
+                self._shutdown()
+            elif not self.finished:
+                self._finish()  # just clean up pipes
 
     def failed(self):
         "check if any process failed, call after poll() or wait()"
-        for p in self.procs:
-            if p.failed():
-                return True
-        return False
+        with self.lock:
+            for p in self.procs:
+                if p.failed():
+                    return True
+            return False
 
     def kill(self, sig=signal.SIGTERM):
         "send a signal to all of the processes in the pipeline"
@@ -735,18 +761,20 @@ class Popen(Pipeline):
     def wait(self):
         """wait to for processes to complete, generate an exception if one
         exits no-zero"""
-        self._close()
-        Pipeline.wait(self)
+        with self.lock:
+            self._close()
+            super(Popen, self).wait()
 
     def poll(self):
         "poll is not allowed for Pipeline objects"
         # FIXME: don't know what to do about our open pipe keeping process from
-        # existing so we can get a status, so disallow it. Not sure how to
+        # exiting so we can get a status, so disallow it. Not sure how to
         # address this.  Can probably address this with select on pipe.
         raise PipettorException("Pipeline.poll() is not supported")
 
     def close(self):
         "wait for process to complete, with an error if it exited non-zero"
-        self._close()
-        if not self.finished:
-            self.wait()
+        with self.lock:
+            self._close()
+            if not self.finished:
+                self.wait()
