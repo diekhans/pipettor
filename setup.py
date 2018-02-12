@@ -33,7 +33,7 @@ setup(
     packages = [
         'pipettor',
     ],
-    package_dir = {'': 'src'},
+    package_dir = {'': 'lib'},
     include_package_data = True,
     install_requires = requirements,
     license = "MIT",

@@ -101,9 +101,9 @@ class DataReader(Dev):
     def __init__(self, binary=False, buffering=-1, encoding=None, errors=None):
         super(DataReader, self).__init__()
         self.binary = binary
-        self.__process = None
-        self.__buffer = []
-        self.__thread = None
+        self._process = None
+        self._buffer = []
+        self._thread = None
         self.read_fh = self.write_fd = None
         read_fd, self.write_fd = os.pipe()
         mode = "rb" if binary else "r"
@@ -114,9 +114,9 @@ class DataReader(Dev):
 
     def _bind_write_to_process(self, process):
         """associate write side with child process."""
-        if self.__process is not None:
+        if self._process is not None:
             raise PipettorException("DataReader already bound to a process")
-        self.__process = process
+        self._process = process
 
     def _post_fork_parent(self):
         """post-fork parent setup."""
@@ -129,15 +129,15 @@ class DataReader(Dev):
 
     def _post_exec_parent(self):
         "called to do any post-exec handling in the parent"
-        self.__thread = threading.Thread(target=self.__reader)
-        self.__thread.daemon = True  # see note at top of this file
-        self.__thread.start()
+        self._thread = threading.Thread(target=self._reader)
+        self._thread.daemon = True  # see note at top of this file
+        self._thread.start()
 
     def close(self):
         "close pipes and terminate thread"
-        if self.__thread is not None:
-            self.__thread.join()
-            self.__thread = None
+        if self._thread is not None:
+            self._thread.join()
+            self._thread = None
         if self.read_fh is not None:
             self.read_fh.close()
             self.read_fh = None
@@ -145,18 +145,18 @@ class DataReader(Dev):
             os.close(self.write_fd)
             self.write_fd = None
 
-    def __reader(self):
+    def _reader(self):
         "child read thread function"
         assert self.write_fd is None
-        self.__buffer.append(self.read_fh.read())
+        self._buffer.append(self.read_fh.read())
 
     @property
     def data(self):
         "return buffered data as a string or bytes"
         if self.binary:
-            return b"".join(self.__buffer)
+            return b"".join(self._buffer)
         else:
-            return "".join(self.__buffer)
+            return "".join(self._buffer)
 
 
 class DataWriter(Dev):
@@ -172,9 +172,9 @@ class DataWriter(Dev):
     def __init__(self, data, buffering=-1, encoding=None, errors=None):
         super(DataWriter, self).__init__()
         binary = not isinstance(data, six.string_types)
-        self.__data = data
-        self.__thread = None
-        self.__process = None
+        self._data = data
+        self._thread = None
+        self._process = None
         self.read_fd = self.write_fh = None
         self.read_fd, write_fd = os.pipe()
         mode = "wb" if binary else "w"
@@ -185,9 +185,9 @@ class DataWriter(Dev):
 
     def _bind_read_to_process(self, process):
         """associate write side with child process."""
-        if self.__process is not None:
+        if self._process is not None:
             raise PipettorException("DataWriter already bound to a process")
-        self.__process = process
+        self._process = process
 
     def _post_fork_parent(self):
         """post-fork parent setup."""
@@ -201,15 +201,15 @@ class DataWriter(Dev):
 
     def _post_exec_parent(self):
         "called to do any post-exec handling in the parent"
-        self.__thread = threading.Thread(target=self.__writer)
-        self.__thread.daemon = True  # see note at top of this file
-        self.__thread.start()
+        self._thread = threading.Thread(target=self._writer)
+        self._thread.daemon = True  # see note at top of this file
+        self._thread.start()
 
     def close(self):
         "close pipes and terminate thread"
-        if self.__thread is not None:
-            self.__thread.join()
-            self.__thread = None
+        if self._thread is not None:
+            self._thread.join()
+            self._thread = None
         if self.read_fd is not None:
             os.close(self.read_fd)
             self.read_fd = None
@@ -217,11 +217,11 @@ class DataWriter(Dev):
             self.write_fh.close()
             self.write_fh = None
 
-    def __writer(self):
+    def _writer(self):
         "write thread function"
         assert self.read_fd is None
         try:
-            self.write_fh.write(self.__data)
+            self.write_fh.write(self._data)
             self.write_fh.close()
             self.write_fh = None
         except IOError as ex:
@@ -236,20 +236,20 @@ class File(Dev):
 
     def __init__(self, path, mode="r"):
         super(File, self).__init__()
-        self.__path = path
-        self.__mode = mode
+        self._path = path
+        self._mode = mode
         # only one of the file descriptors is ever opened
         self.read_fd = self.write_fd = None
         _validate_mode(mode, allow_append=True)
-        if self.__mode[0] == 'r':
-            self.read_fd = os.open(self.__path, os.O_RDONLY)
-        elif self.__mode[0] == 'w':
-            self.write_fd = os.open(self.__path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o666)
+        if self._mode[0] == 'r':
+            self.read_fd = os.open(self._path, os.O_RDONLY)
+        elif self._mode[0] == 'w':
+            self.write_fd = os.open(self._path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o666)
         else:
-            self.write_fd = os.open(self.__path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o666)
+            self.write_fd = os.open(self._path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o666)
 
     def __str__(self):
-        return self.__path
+        return self._path
 
     def close(self):
         "close file if open"
@@ -302,13 +302,13 @@ class _StatusPipe(object):
         self.read_fh = _open_compat(read_fd, "rb")
         self.write_fh = _open_compat(write_fd, "wb")
         try:
-            self.__set_close_on_exec(self.write_fh)
+            self._set_close_on_exec(self.write_fh)
         except BaseException:
             self.close()
             raise
 
     @staticmethod
-    def __set_close_on_exec(fh):
+    def _set_close_on_exec(fh):
         flags = fcntl.fcntl(fh.fileno(), fcntl.F_GETFD)
         fcntl.fcntl(fh.fileno(), fcntl.F_SETFD, flags | fcntl.FD_CLOEXEC)
 

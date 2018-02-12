@@ -8,7 +8,7 @@ import re
 import signal
 import six
 if __name__ == '__main__':
-    sys.path.insert(0, os.path.normpath(os.path.dirname(sys.argv[0])) + "/../src")
+    sys.path.insert(0, os.path.normpath(os.path.dirname(sys.argv[0])) + "/../lib")
     from testCaseBase import TestCaseBase, TestLogging
 else:
     from .testCaseBase import TestCaseBase, TestLogging

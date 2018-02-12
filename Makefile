@@ -49,8 +49,7 @@ clean-build:
 clean-pyc:
 	find . -name '*.pyc' -exec rm -f {} +
 	find . -name '*.pyo' -exec rm -f {} +
-	find . -name '*~' -exec rm -f {} +
-	find . -name '__pycache__' -exec rm -fr {} +
+	find . -depth -name '__pycache__' -exec rm -fr {} +
 
 clean-docs:
 	rm -f docs/pipettor.rst
@@ -63,7 +62,7 @@ clean-test:
 	rm -fr htmlcov/
 
 lint:
-	flake8 src/pipettor tests
+	flake8 lib/pipettor tests
 
 test:
 	python setup.py test
@@ -80,7 +79,7 @@ coverage:
 docs:
 	rm -f docs/pipettor.rst
 	rm -f docs/modules.rst
-	sphinx-apidoc -o docs/ src
+	sphinx-apidoc -o docs/ lib
 	$(MAKE) -C docs clean
 	$(MAKE) -C docs html
 

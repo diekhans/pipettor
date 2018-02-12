@@ -3,7 +3,20 @@
 History
 -------
 
-0.1.1 (2017-06-11)
----------------------
+0.3.0 ()
+-----------------------
+* added open-stying buffering, encoding, and errors options
+* source cleanup
 
+0.2.0 (2017-09-19)
+-----------------------
+* Simplified and log of info and errors levels by removing logLevel options.
+* Improvements to documentation.
+
+0.1.3 (2017-06-13)
+------------------
+* Documentation fixes
+
+0.1.2 (2017-06-11)
+------------------
 * First public release on PyPI.

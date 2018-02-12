@@ -116,11 +116,11 @@ class Process(object):
     def __init__(self, cmd, stdin=None, stdout=None, stderr=None):
         self.cmd = tuple(cmd)
         # stdio and argument Dev association
-        self.stdin = self.__stdio_assoc(stdin, "r")
-        self.stdout = self.__stdio_assoc(stdout, "w")
+        self.stdin = self._stdio_assoc(stdin, "r")
+        self.stdout = self._stdio_assoc(stdout, "w")
         if stderr == DataReader:
             stderr = DataReader()
-        self.stderr = self.__stdio_assoc(stderr, "w")
+        self.stderr = self._stdio_assoc(stderr, "w")
         self.pid = None
         self.pgid = None
         self.status_pipe = None
@@ -138,7 +138,7 @@ class Process(object):
             strs.append(pipes.quote(str(arg)))
         return " ".join(strs)
 
-    def __wrapProcessException(self, cause):
+    def _wrapProcessException(self, cause):
         """wrap in ProcessException without losing causing exception, on Py3, use
         exception chaining, on PY2, set as stderr, however __cause__ is not
         pickled, so we set it in stderr now too.
@@ -152,7 +152,7 @@ class Process(object):
         else:
             return ProcessException(str(self), stderr=repr(cause))
 
-    def __stdio_assoc(self, spec, mode):
+    def _stdio_assoc(self, spec, mode):
         """pre-fork check a stdio spec validity and associate Dev or file
         number.  mode is mode in child"""
         if (spec is None) or isinstance(spec, int):
@@ -167,7 +167,7 @@ class Process(object):
         else:
             raise PipettorException("invalid stdio specification object type: {} {}".format(type(spec), spec))
 
-    def __child_stdio_setup(self, spec, stdfd):
+    def _child_stdio_setup(self, spec, stdfd):
         """post-fork setup one of the stdio fds."""
         fd = None
         if spec is None:
@@ -178,14 +178,14 @@ class Process(object):
             fd = spec.read_fd if stdfd == 0 else spec.write_fd
         if fd is None:
             # this should have been detected before forking
-            raise PipettorException("__child_stdio_setup logic error: {} {}".format(type(spec), stdfd))
+            raise PipettorException("_child_stdio_setup logic error: {} {}".format(type(spec), stdfd))
         # dup to target descriptor if not already there
         if fd != stdfd:
             os.dup2(fd, stdfd)
             # Don't close source file here, must delay closing in case stdout/err is same fd.
-            # Close is done by __child_close_files
+            # Close is done by _child_close_files
 
-    def __child_close_files(self):
+    def _child_close_files(self):
         "clone non-stdio files"
         keepOpen = set([self.status_pipe.write_fh.fileno()])
         for fd in xrange(3, MAXFD + 1):
@@ -195,16 +195,16 @@ class Process(object):
             except OSError:
                 pass
 
-    def __child_set_signals(self):
+    def _child_set_signals(self):
         signal.signal(signal.SIGPIPE, signal.SIG_DFL)  # ensure terminate on pipe close
 
-    def __child_setup_devices(self):
+    def _child_setup_devices(self):
         "post-fork setup of devices"
         for std in (self.stdin, self.stdout, self.stderr):
             if isinstance(std, Dev):
                 std._post_fork_child()
 
-    def __child_setup_process_group(self):
+    def _child_setup_process_group(self):
         """setup process group, if this is the first process, it becomes the
         process group leader and sends a message when it's done"""
         if self.pgid is None:
@@ -214,38 +214,38 @@ class Process(object):
         else:
             os.setpgid(self.pid, self.pgid)
 
-    def __child_exec(self):
+    def _child_exec(self):
         "guts of start child process"
         self.status_pipe._post_fork_child()
-        self.__child_setup_process_group()
-        self.__child_setup_devices()
-        self.__child_stdio_setup(self.stdin, 0)
-        self.__child_stdio_setup(self.stdout, 1)
-        self.__child_stdio_setup(self.stderr, 2)
-        self.__child_close_files()
-        self.__child_set_signals()
+        self._child_setup_process_group()
+        self._child_setup_devices()
+        self._child_stdio_setup(self.stdin, 0)
+        self._child_stdio_setup(self.stdout, 1)
+        self._child_stdio_setup(self.stderr, 2)
+        self._child_close_files()
+        self._child_set_signals()
         os.execvp(self.cmd[0], self.cmd)
 
-    def __child_do_exec(self):
+    def _child_do_exec(self):
         " in child process"
         try:
-            self.__child_exec()
+            self._child_exec()
         except Exception as ex:
             if not isinstance(ex, ProcessException):
-                ex = self.__wrapProcessException(ex)
+                ex = self._wrapProcessException(ex)
             self.status_pipe.send(ex)
             os._exit(255)
 
-    def __child_start(self):
+    def _child_start(self):
         "start in child process"
         try:
-            self.__child_do_exec()
+            self._child_do_exec()
         except Exception as ex:
             _warn_error_during_error_handling("child process exec error handling logic error", ex)
         finally:
             os.abort()  # should never make it here
 
-    def __parent_setup_process_group_leader(self):
+    def _parent_setup_process_group_leader(self):
         status = self.status_pipe.receive()
         if status is None:
             raise PipettorException("child process exited without setting process group")
@@ -256,14 +256,14 @@ class Process(object):
         else:
             raise PipettorException("expected _SetpgidCompleteMsg message, got {}".format(status))
 
-    def __parent_start(self):
+    def _parent_start(self):
         "start in parent process"
         self.status_pipe._post_fork_parent()
         if self.pgid is None:
             # first process is process leader.
-            self.__parent_setup_process_group_leader()
+            self._parent_setup_process_group_leader()
 
-    def __start_processes(self, pgid):
+    def _start_processes(self, pgid):
         "Do work of starting the process, if pgid is None do group leader setup"
         self.pgid = pgid
         self.status_pipe = _StatusPipe()
@@ -279,14 +279,14 @@ class Process(object):
             if gc_was_enabled:
                 gc.enable()
         if self.pid == 0:
-            self.__child_start()
+            self._child_start()
         else:
-            self.__parent_start()
+            self._parent_start()
 
     def _start(self, pgid):
         "start the process,, if pgid is do group leader setup"
         try:
-            self.__start_processes(pgid)
+            self._start_processes(pgid)
         except BaseException:
             self.exceptinfo = sys.exc_info()
         if self.exceptinfo is not None:
@@ -300,7 +300,7 @@ class Process(object):
             if not isinstance(ex, Exception):
                 ex = PipettorException("unexpected object return from child exec status pipe: {}: {}".format(type(ex), ex))
             if not isinstance(ex, ProcessException):
-                ex = self.__wrapProcessException(ex)
+                ex = self._wrapProcessException(ex)
             raise ex
         self.status_pipe.close()
 
@@ -313,14 +313,14 @@ class Process(object):
         if self.exceptinfo is not None:
             six.reraise(self.exceptinfo[0], self.exceptinfo[1], self.exceptinfo[2])
 
-    def __parent_stdio_exit_close(self):
+    def _parent_stdio_exit_close(self):
         "close devices on edit"
-        # MUST do before reading stderr in __handle_error_exit
+        # MUST do before reading stderr in _handle_error_exit
         for std in (self.stdin, self.stdout, self.stderr):
             if isinstance(std, Dev):
                 std.close()
 
-    def __handle_error_exit(self):
+    def _handle_error_exit(self):
         # get saved stderr, if possible
         stderr = None
         if isinstance(self.stderr, DataReader):
@@ -334,9 +334,9 @@ class Process(object):
         self.finished = True
         assert(os.WIFEXITED(waitStat) or os.WIFSIGNALED(waitStat))
         self.returncode = os.WEXITSTATUS(waitStat) if os.WIFEXITED(waitStat) else -os.WTERMSIG(waitStat)
-        self.__parent_stdio_exit_close()  # MUST DO BEFORE __handle_error_exit
+        self._parent_stdio_exit_close()  # MUST DO BEFORE _handle_error_exit
         if not ((self.returncode == 0) or (self.returncode == -signal.SIGPIPE)):
-            self.__handle_error_exit()
+            self._handle_error_exit()
         self.status_pipe.close()
 
     def poll(self):
@@ -408,27 +408,27 @@ class Pipeline(object):
 
         if isinstance(cmds[0], six.string_types):
             cmds = [cmds]  # one-process pipeline
-        cmds = self.__stringify(cmds)
+        cmds = self._stringify(cmds)
         try:
-            self.__setup_processes(cmds)
+            self._setup_processes(cmds)
         except BaseException:
-            self.__error_cleanup()
+            self._error_cleanup()
             raise
 
     @staticmethod
-    def __stringify(cmds):
+    def _stringify(cmds):
         ncmds = []
         for cmd in cmds:
             ncmds.append([str(a) for a in cmd])
         return ncmds
 
-    def __setup_processes(self, cmds):
+    def _setup_processes(self, cmds):
         prevPipe = None
         lastCmdIdx = len(cmds) - 1
         for i in xrange(len(cmds)):
-            prevPipe = self.__add_process(cmds[i], prevPipe, (i == lastCmdIdx), self.stdin, self.stdout, self.stderr)
+            prevPipe = self._add_process(cmds[i], prevPipe, (i == lastCmdIdx), self.stdin, self.stdout, self.stderr)
 
-    def __add_process(self, cmd, prevPipe, isLastCmd, stdinFirst, stdoutLast, stderr):
+    def _add_process(self, cmd, prevPipe, isLastCmd, stdinFirst, stdoutLast, stderr):
         """add one process to the pipeline, return the output pipe if not the last process"""
         if prevPipe is None:
             stdin = stdinFirst  # first process in pipeline
@@ -440,14 +440,14 @@ class Pipeline(object):
         else:
             outPipe = stdout = _SiblingPipe()
         try:
-            self.__create_process(cmd, stdin, stdout, stderr)
+            self._create_process(cmd, stdin, stdout, stderr)
         except BaseException:
             if outPipe is not None:
                 outPipe.close()
             raise
         return outPipe
 
-    def __create_process(self, cmd, stdin, stdout, stderr):
+    def _create_process(self, cmd, stdin, stdout, stderr):
         """create process and track Dev objects"""
         proc = Process(cmd, stdin, stdout, stderr)
         self.procs.append(proc)
@@ -473,30 +473,30 @@ class Pipeline(object):
             desc += " 2>" + str(self.stderr)
         return desc
 
-    def __post_fork_parent(self):
+    def _post_fork_parent(self):
         for d in self.devs:
             d._post_fork_parent()
 
-    def __start_process(self, proc):
+    def _start_process(self, proc):
         proc._start(self.pgid)
         self.bypid[proc.pid] = proc
         assert(proc.pgid is not None)
         if self.pgid is None:
             self.pgid = proc.pgid
 
-    def __start(self):
+    def _start(self):
         for proc in self.procs:
-            self.__start_process(proc)
+            self._start_process(proc)
 
-    def __exec_barrier(self):
+    def _exec_barrier(self):
         for p in self.procs:
             p._execwait()
 
-    def __post_exec_parent(self):
+    def _post_exec_parent(self):
         for d in self.devs:
             d._post_exec_parent()
 
-    def __finish(self):
+    def _finish(self):
         "finish up when no errors have occurred"
         assert not self.failed()
         self.finished = True
@@ -506,30 +506,30 @@ class Pipeline(object):
         if self.logger is not None:
             self.logger.log(self.logLevel, "success: {}".format(str(self)))
 
-    def __log_failure(self, ex):
+    def _log_failure(self, ex):
         if self.logger is not None:
             self.logger.log(self.logLevel, "failure: {}: {}".format(str(self), str(ex)))
 
-    def __error_cleanup_dev(self, dev):
+    def _error_cleanup_dev(self, dev):
         try:
             dev.close()
         except Exception as ex:
             _warn_error_during_error_handling("error during device cleanup on error", ex)
 
-    def __error_cleanup_process(self, proc):
+    def _error_cleanup_process(self, proc):
         try:
             proc._force_finish()
         except Exception as ex:
             _warn_error_during_error_handling("error during process cleanup on error", ex)
 
-    def __error_cleanup(self):
+    def _error_cleanup(self):
         """forced cleanup of child processed after failure"""
         self.finished = True
         self.running = False
         for d in self.devs:
-            self.__error_cleanup_dev(d)
+            self._error_cleanup_dev(d)
         for p in self.procs:
-            self.__error_cleanup_process(p)
+            self._error_cleanup_process(p)
 
     def start(self):
         """start processes"""
@@ -539,13 +539,13 @@ class Pipeline(object):
         self.running = True
         # clean up devices and process if there is a failure
         try:
-            self.__start()
-            self.__post_fork_parent()
-            self.__exec_barrier()
-            self.__post_exec_parent()
+            self._start()
+            self._post_fork_parent()
+            self._exec_barrier()
+            self._post_exec_parent()
         except Exception as ex:
-            self.__log_failure(ex)
-            self.__error_cleanup()
+            self._log_failure(ex)
+            self._error_cleanup()
             raise
 
     def _raise_if_failed(self):
@@ -554,14 +554,14 @@ class Pipeline(object):
             for p in self.procs:
                 p._raise_if_failed()
         except Exception as ex:
-            self.__log_failure(ex)
+            self._log_failure(ex)
             raise
 
-    def __poll(self):
+    def _poll(self):
         for p in self.procs:
             if not p.poll():
                 return False
-        self.__finish()
+        self._finish()
         return True
 
     def poll(self):
@@ -570,12 +570,12 @@ class Pipeline(object):
         if not self.started:
             self.start()
         try:
-            return self.__poll()
+            return self._poll()
         except BaseException:
-            self.__error_cleanup()
+            self._error_cleanup()
             raise
 
-    def __wait_on_one(self):
+    def _wait_on_one(self):
         "wait on the next process in group to complete, return False if no more"
         try:
             w = os.waitpid(-self.pgid, 0)
@@ -587,8 +587,8 @@ class Pipeline(object):
         p._handle_exit(w[1])
         return True
 
-    def __wait(self):
-        while self.__wait_on_one():
+    def _wait(self):
+        while self._wait_on_one():
             pass
 
     def wait(self):
@@ -598,13 +598,13 @@ class Pipeline(object):
         if not self.started:
             self.start()
         try:
-            self.__wait()
+            self._wait()
         except Exception as ex:
-            self.__log_failure(ex)
-            self.__error_cleanup()
+            self._log_failure(ex)
+            self._error_cleanup()
             raise
         self._raise_if_failed()
-        self.__finish()
+        self._finish()
 
     def shutdown(self):
         """Close down the pipeline prematurely. If the pipeline is running,
@@ -614,9 +614,9 @@ class Pipeline(object):
         for error recovery"""
         # FIXME: need to restructure some of these functions
         if self.running:
-            self.__error_cleanup()
+            self._error_cleanup()
         else:
-            self.__finish()
+            self._finish()
 
     def failed(self):
         "check if any process failed, call after poll() or wait()"
@@ -662,8 +662,8 @@ class Popen(Pipeline):
     def __init__(self, cmds, mode='r', stdin=None, stdout=None, logger=None, logLevel=None,
                  buffering=-1, encoding=None, errors=None):
         self.mode = mode
-        self.__parent_fh = None
-        self.__child_fd = None
+        self._parent_fh = None
+        self._child_fd = None
         _validate_mode(mode, allow_append=False)
         if mode[0] == "r":
             if stdout is not None:
@@ -676,25 +676,25 @@ class Popen(Pipeline):
         if mode[0] == "r":
             firstIn = stdin
             lastOut = pipe_write_fd
-            self.__child_fd = pipe_write_fd
-            self.__parent_fh = _open_compat(pipe_read_fd, mode, buffering=buffering, encoding=encoding, errors=errors)
+            self._child_fd = pipe_write_fd
+            self._parent_fh = _open_compat(pipe_read_fd, mode, buffering=buffering, encoding=encoding, errors=errors)
         else:
             firstIn = pipe_read_fd
             lastOut = stdout
-            self.__child_fd = pipe_read_fd
-            self.__parent_fh = _open_compat(pipe_write_fd, mode, buffering=buffering, encoding=encoding, errors=errors)
+            self._child_fd = pipe_read_fd
+            self._parent_fh = _open_compat(pipe_write_fd, mode, buffering=buffering, encoding=encoding, errors=errors)
         super(Popen, self).__init__(cmds, stdin=firstIn, stdout=lastOut, logger=logger, logLevel=logLevel)
         self.start()
-        os.close(self.__child_fd)
-        self.__child_fd = None
+        os.close(self._child_fd)
+        self._child_fd = None
 
-    def __close(self):
-        if self.__parent_fh is not None:
-            self.__parent_fh.close()
-            self.__parent_fh = None
-        if self.__child_fd is not None:
-            os.close(self.__child_fd)
-            self.__child_fd = None
+    def _close(self):
+        if self._parent_fh is not None:
+            self._parent_fh.close()
+            self._parent_fh = None
+        if self._child_fd is not None:
+            os.close(self._child_fd)
+            self._child_fd = None
 
     def __enter__(self):
         "support for with statement"
@@ -706,36 +706,36 @@ class Popen(Pipeline):
 
     def __iter__(self):
         "iter over contents of file"
-        return self.__parent_fh.__iter__()
+        return self._parent_fh.__iter__()
 
     def next(self):
-        return self.__parent_fh.next()
+        return self._parent_fh.next()
 
     def flush(self):
         "Flush the internal I/O buffer."
-        self.__parent_fh.flush()
+        self._parent_fh.flush()
 
     def fileno(self):
         "get the integer OS-dependent file handle"
-        return self.__parent_fh.fileno()
+        return self._parent_fh.fileno()
 
     def write(self, str):
         "Write string str to file."
-        self.__parent_fh.write(str)
+        self._parent_fh.write(str)
 
     def read(self, size=-1):
-        return self.__parent_fh.read(size)
+        return self._parent_fh.read(size)
 
     def readline(self, size=-1):
-        return self.__parent_fh.readline(size)
+        return self._parent_fh.readline(size)
 
     def readlines(self, size=-1):
-        return self.__parent_fh.readlines(size)
+        return self._parent_fh.readlines(size)
 
     def wait(self):
         """wait to for processes to complete, generate an exception if one
         exits no-zero"""
-        self.__close()
+        self._close()
         Pipeline.wait(self)
 
     def poll(self):
@@ -747,6 +747,6 @@ class Popen(Pipeline):
 
     def close(self):
         "wait for process to complete, with an error if it exited non-zero"
-        self.__close()
+        self._close()
         if not self.finished:
             self.wait()
