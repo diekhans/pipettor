@@ -24,7 +24,7 @@ test_requirements = [
 
 setup(
     name = 'pipettor',
-    version = '0.2.0',
+    version = '0.3.0',
     description = "pipettor - robust, easy to use Unix process pipelines",
     long_description = readme + '\n\n' + history,
     author = "Mark Diekhans",
@@ -33,7 +33,7 @@ setup(
     packages = [
         'pipettor',
     ],
-    package_dir = {'': 'src'},
+    package_dir = {'': 'lib'},
     include_package_data = True,
     install_requires = requirements,
     license = "MIT",

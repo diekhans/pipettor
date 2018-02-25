@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # Copyright 2006-2015 Mark Diekhans
 from __future__ import print_function
 import unittest
@@ -7,7 +8,7 @@ import re
 import signal
 import six
 if __name__ == '__main__':
-    sys.path.insert(0, os.path.normpath(os.path.dirname(sys.argv[0])) + "/../src")
+    sys.path.insert(0, os.path.normpath(os.path.dirname(sys.argv[0])) + "/../lib")
     from testCaseBase import TestCaseBase, TestLogging
 else:
     from .testCaseBase import TestCaseBase, TestLogging
@@ -443,6 +444,15 @@ class PopenTests(PipettorTestBase):
         pl = Popen([("yes",), ("true",)], "r")
         pl.wait()
         self.commonChecks(nopen, pl, "^yes | true >.+ 2>\\[DataReader\\]$", isRe=True)
+
+    def testReadAsAsciiReplace(self):
+        # file contains unicode character outside of the ASCII range
+        nopen = self.numOpenFiles()
+        inf = self.getInputFile("nonAscii.txt")
+        with Popen(["cat", inf], encoding='latin-1', errors="replace") as fh:
+            lines = [l[:-1] for l in fh]
+        self.assertEqual(['Microtubules are assembled from dimers of a- and \xc3\x9f-tubulin.'], lines)
+        self.orphanChecks(nopen)
 
 
 class FunctionTests(PipettorTestBase):

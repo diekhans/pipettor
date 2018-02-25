@@ -1,2 +1,0 @@
-
-- gencode rsl STAR runs still hang on control-C

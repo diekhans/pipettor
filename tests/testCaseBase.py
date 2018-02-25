@@ -15,7 +15,7 @@ xrange = six.moves.builtins.range
 
 try:
     MAXFD = os.sysconf("SC_OPEN_MAX")
-except:
+except ValueError:
     MAXFD = 256
 
 
@@ -228,7 +228,7 @@ class TestCaseBase(unittest.TestCase):
         for fd in xrange(0, MAXFD):
             try:
                 os.fstat(fd)
-            except:
+            except OSError:
                 n += 1
         return MAXFD - n
 

@@ -19,7 +19,7 @@ or on Mac OS/X
 python setup.py register -r pypitest
 
 ** Update the version in code, but don't change git.  Version number needed for testing pip, however this might result in changes
-bumpversion --allow-dirty --no-commit -no-tag major|minor|patch
+bumpversion --allow-dirty --no-commit --no-tag major|minor|patch
 ** testing pip install using pypitest.  Must bump version for retesting:
 make test-release
 ** test release install from pypitest in virtualenv
@@ -30,7 +30,7 @@ make test-release-pip
 ** one time setup:
 python setup.py register -r pypi
 ** do all of the above testing
-** WARNING: may have to update git tag if anyt 
+** WARNING: may have to update git tag if any 
 ** update HISTORY.rst
 ** Do the git duty
 commit to master
@@ -38,5 +38,7 @@ git tag v???
 git push origin --tags
 git push
 ** make release
+** git push origin --tags
+** git status  # make sure origin is in sync
 ** update readthedocs version in GUI
 ** test release install

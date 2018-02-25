@@ -1,5 +1,7 @@
 # -*- mode: makefile-gmake  -*-
 
+PYTHON = python2.7
+
 .PHONY: help clean clean-build clean-pyc clean-docs clean-tests \
 	lint test test-all coverage \
 	docs docs-open \
@@ -16,7 +18,7 @@ pypitest_url = https://test.pypi.org/simple/
 define envsetup
 	@rm -rf ${testenv}
 	mkdir -p ${testenv}
-	virtualenv --quiet ${testenv}
+	${PYTHON} -m virtualenv --quiet ${testenv}
 endef
 envact = cd ${testenv} && source ./bin/activate
 
@@ -52,8 +54,7 @@ clean-build:
 clean-pyc:
 	find . -name '*.pyc' -exec rm -f {} +
 	find . -name '*.pyo' -exec rm -f {} +
-	find . -name '*~' -exec rm -f {} +
-	find . -name '__pycache__' -exec rm -fr {} +
+	find . -depth -name '__pycache__' -exec rm -fr {} +
 
 clean-docs:
 	rm -f docs/pipettor.rst
@@ -66,10 +67,10 @@ clean-test:
 	rm -fr htmlcov/
 
 lint:
-	flake8 src/pipettor tests
+	flake8 lib/pipettor tests
 
 test:
-	python setup.py test
+	${PYTHON} setup.py test
 
 test-all:
 	tox
@@ -83,7 +84,7 @@ coverage:
 docs:
 	rm -f docs/pipettor.rst
 	rm -f docs/modules.rst
-	sphinx-apidoc -o docs/ src
+	sphinx-apidoc -o docs/ lib
 	$(MAKE) -C docs clean
 	$(MAKE) -C docs html
 
@@ -91,18 +92,18 @@ docs-open: docs
 	open docs/_build/html/index.html
 
 install: clean
-	python setup.py install
+	${PYTHON} setup.py install
 
 dist: clean
-	python setup.py sdist
-	python setup.py bdist_wheel
+	${PYTHON} setup.py sdist
+	${PYTHON} setup.py bdist_wheel
 	ls -l dist
 
 # test install locally
 test-pip: dist
 	${envsetup}
 	${envact} && pip install --no-cache-dir ../dist/pipettor-*.tar.gz
-	${envact} && python ../tests/pipettorTests.py
+	${envact} && ${PYTHON} ../tests/pipettorTests.py
 
 # test release to pypitest
 test-release: dist
@@ -112,7 +113,7 @@ test-release: dist
 test-release-pip:
 	${envsetup}
 	${envact} && pip install --no-cache-dir --index-url=${pypitest_url} pipettor
-	${envact} && python ../tests/pipettorTests.py
+	${envact} && ${PYTHON} ../tests/pipettorTests.py
 
 release: dist
 	twine upload --repository=pypi dist/pipettor-*.whl dist/pipettor-*.tar.gz

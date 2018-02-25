@@ -3,6 +3,7 @@
 pipettor interfaces to files and pipes, as well as some other IPC stuff.
 """
 from __future__ import print_function
+import six
 import os
 import re
 import fcntl
@@ -35,6 +36,16 @@ def _validate_mode(mode, allow_append):
         raise PipettorException("invalid mode: '{}', expected {} with optional 'b' suffix".format(mode, expect))
 
 
+def _open_compat(fd_or_path, mode, buffering=-1, encoding=None, errors=None):
+    """PY2/3 compatibility wrapper for open/fdopen"""
+    if six.PY3:
+        return open(fd_or_path, mode, buffering=buffering, encoding=encoding, errors=errors)
+    elif isinstance(fd_or_path, int):
+        return os.fdopen(fd_or_path, mode, buffering)
+    else:
+        return open(fd_or_path, mode, buffering)
+
+
 class Dev(object):
     """Base class for objects specifying process input or output.  They
     provide a way of hide details of setting up interprocess
@@ -45,9 +56,6 @@ class Dev(object):
        read_fh - file object for reading
        write_fd - file integer descriptor for writing
        write_fh - file object for writing"""
-
-    def __init__(self, binary):
-        self.binary = binary
 
     def _bind_read_to_process(self, process):
         """associate read side with child process."""
@@ -87,28 +95,28 @@ class DataReader(Dev):
     pipeline.
 
     For Python3, specifying binary results in data of type bytes, otherwise
-    str.
+    str.  The buffering, encoding, and errors arguments are as used in the
+    Python 3 open() function.  With Python 2, encoding and error is ignored.
     """
-    def __init__(self, binary=False):
-        super(DataReader, self).__init__(binary)
+    def __init__(self, binary=False, buffering=-1, encoding=None, errors=None):
+        super(DataReader, self).__init__()
+        self.binary = binary
+        self._process = None
+        self._buffer = []
+        self._thread = None
+        self.read_fh = self.write_fd = None
         read_fd, self.write_fd = os.pipe()
-        self.read_fh = os.fdopen(read_fd, "rb" if binary else "r")
-        self.__process = None
-        self.__buffer = []
-        self.__thread = None
-
-    def __del__(self):
-        "finalizer"
-        self.close()
+        mode = "rb" if binary else "r"
+        self.read_fh = _open_compat(read_fd, mode, buffering, encoding, errors)
 
     def __str__(self):
         return "[DataReader]"
 
     def _bind_write_to_process(self, process):
         """associate write side with child process."""
-        if self.__process is not None:
+        if self._process is not None:
             raise PipettorException("DataReader already bound to a process")
-        self.__process = process
+        self._process = process
 
     def _post_fork_parent(self):
         """post-fork parent setup."""
@@ -121,15 +129,15 @@ class DataReader(Dev):
 
     def _post_exec_parent(self):
         "called to do any post-exec handling in the parent"
-        self.__thread = threading.Thread(target=self.__reader)
-        self.__thread.daemon = True  # see note at top of this file
-        self.__thread.start()
+        self._thread = threading.Thread(target=self._reader)
+        self._thread.daemon = True  # see note at top of this file
+        self._thread.start()
 
     def close(self):
         "close pipes and terminate thread"
-        if self.__thread is not None:
-            self.__thread.join()
-            self.__thread = None
+        if self._thread is not None:
+            self._thread.join()
+            self._thread = None
         if self.read_fh is not None:
             self.read_fh.close()
             self.read_fh = None
@@ -137,46 +145,49 @@ class DataReader(Dev):
             os.close(self.write_fd)
             self.write_fd = None
 
-    def __reader(self):
+    def _reader(self):
         "child read thread function"
         assert self.write_fd is None
-        self.__buffer.append(self.read_fh.read())
+        self._buffer.append(self.read_fh.read())
 
     @property
     def data(self):
         "return buffered data as a string or bytes"
         if self.binary:
-            return b"".join(self.__buffer)
+            return b"".join(self._buffer)
         else:
-            return "".join(self.__buffer)
+            return "".join(self._buffer)
 
 
 class DataWriter(Dev):
     """Object to asynchronously write data to process from memory via a pipe.  A
     thread is use to prevent deadlock when both reading and writing to a child
-    pipeline.
+    pipeline.  Text or binary output is determined by the type of data.
+
+    For Python3, binary results in data of type bytes, otherwise str.  The
+    buffering, encoding, and errors arguments are as used in the Python 3
+    open() function. With Python 2, encoding and error is ignored.
     """
 
-    def __init__(self, data):
-        super(DataWriter, self).__init__(False if isinstance(data, str) else True)
-        self.__data = data
+    def __init__(self, data, buffering=-1, encoding=None, errors=None):
+        super(DataWriter, self).__init__()
+        binary = not isinstance(data, six.string_types)
+        self._data = data
+        self._thread = None
+        self._process = None
+        self.read_fd = self.write_fh = None
         self.read_fd, write_fd = os.pipe()
-        self.write_fh = os.fdopen(write_fd, "wb" if self.binary else "w")
-        self.__thread = None
-        self.__process = None
-
-    def __del__(self):
-        "finalizer"
-        self.close()
+        mode = "wb" if binary else "w"
+        self.write_fh = _open_compat(write_fd, mode, buffering, encoding, errors)
 
     def __str__(self):
         return "[DataWriter]"
 
     def _bind_read_to_process(self, process):
         """associate write side with child process."""
-        if self.__process is not None:
+        if self._process is not None:
             raise PipettorException("DataWriter already bound to a process")
-        self.__process = process
+        self._process = process
 
     def _post_fork_parent(self):
         """post-fork parent setup."""
@@ -190,15 +201,15 @@ class DataWriter(Dev):
 
     def _post_exec_parent(self):
         "called to do any post-exec handling in the parent"
-        self.__thread = threading.Thread(target=self.__writer)
-        self.__thread.daemon = True  # see note at top of this file
-        self.__thread.start()
+        self._thread = threading.Thread(target=self._writer)
+        self._thread.daemon = True  # see note at top of this file
+        self._thread.start()
 
     def close(self):
         "close pipes and terminate thread"
-        if self.__thread is not None:
-            self.__thread.join()
-            self.__thread = None
+        if self._thread is not None:
+            self._thread.join()
+            self._thread = None
         if self.read_fd is not None:
             os.close(self.read_fd)
             self.read_fd = None
@@ -206,11 +217,11 @@ class DataWriter(Dev):
             self.write_fh.close()
             self.write_fh = None
 
-    def __writer(self):
+    def _writer(self):
         "write thread function"
         assert self.read_fd is None
         try:
-            self.write_fh.write(self.__data)
+            self.write_fh.write(self._data)
             self.write_fh.close()
             self.write_fh = None
         except IOError as ex:
@@ -221,30 +232,24 @@ class DataWriter(Dev):
 
 class File(Dev):
     """A file path for input or output, used for specifying stdio associated
-    with files."""
+    with files. Mode starts with standard r, w, or a"""
 
     def __init__(self, path, mode="r"):
-        """constructor, mode is standard r,w, or a with, include b for
-        binary data"""
-        super(File, self).__init__(mode.find("b") >= 0)
-        self.__path = path
-        self.__mode = mode
+        super(File, self).__init__()
+        self._path = path
+        self._mode = mode
         # only one of the file descriptors is ever opened
         self.read_fd = self.write_fd = None
-        # must follow setting *_fd fields for __del__
         _validate_mode(mode, allow_append=True)
-        if self.__mode[0] == 'r':
-            self.read_fd = os.open(self.__path, os.O_RDONLY)
-        elif self.__mode[0] == 'w':
-            self.write_fd = os.open(self.__path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o666)
+        if self._mode[0] == 'r':
+            self.read_fd = os.open(self._path, os.O_RDONLY)
+        elif self._mode[0] == 'w':
+            self.write_fd = os.open(self._path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o666)
         else:
-            self.write_fd = os.open(self.__path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o666)
-
-    def __del__(self):
-        self.close()
+            self.write_fd = os.open(self._path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o666)
 
     def __str__(self):
-        return self.__path
+        return self._path
 
     def close(self):
         "close file if open"
@@ -264,13 +269,9 @@ class _SiblingPipe(Dev):
     """Interprocess communication between two child process by anonymous
     pipes."""
 
-    def __init__(self, binary=False):
-        super(_SiblingPipe, self).__init__(binary)
+    def __init__(self):
+        super(_SiblingPipe, self).__init__()
         self.read_fd, self.write_fd = os.pipe()
-
-    def __del__(self):
-        "finalizer"
-        self.close()
 
     def __str__(self):
         return "[Pipe]"
@@ -298,21 +299,18 @@ class _StatusPipe(object):
 
     def __init__(self):
         read_fd, write_fd = os.pipe()
-        self.read_fh = os.fdopen(read_fd, "rb")
-        self.write_fh = os.fdopen(write_fd, "wb")
+        self.read_fh = _open_compat(read_fd, "rb")
+        self.write_fh = _open_compat(write_fd, "wb")
         try:
-            self.__set_close_on_exec(self.write_fh)
-        except:
+            self._set_close_on_exec(self.write_fh)
+        except BaseException:
             self.close()
             raise
 
     @staticmethod
-    def __set_close_on_exec(fh):
+    def _set_close_on_exec(fh):
         flags = fcntl.fcntl(fh.fileno(), fcntl.F_GETFD)
         fcntl.fcntl(fh.fileno(), fcntl.F_SETFD, flags | fcntl.FD_CLOEXEC)
-
-    def __del__(self):
-        self.close()
 
     def close(self):
         "close pipes if open"
