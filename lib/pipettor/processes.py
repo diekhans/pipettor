@@ -525,7 +525,7 @@ class Pipeline(object):
         self.running = False
         for d in self.devs:
             d.close()
-        self._log(logging.INFO, "success")
+        self._log(self.logLevel, "success")
 
     def _log_failure(self, ex):
         self._log(logging.ERROR, "failure", ex)
@@ -552,7 +552,7 @@ class Pipeline(object):
             self._error_cleanup_process(p)
 
     def _start_guts(self):
-        self._log(logging.INFO, "start")
+        self._log(self.logLevel, "start")
         self.started = True
         self.running = True
         # clean up devices and process if there is a failure
