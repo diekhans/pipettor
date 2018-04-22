@@ -12,7 +12,6 @@ import errno
 import pipes
 import logging
 from threading import RLock
-from pipettor.devices import _validate_mode
 from pipettor.devices import _open_compat
 from pipettor.devices import Dev
 from pipettor.devices import DataReader
@@ -701,8 +700,9 @@ class Popen(Pipeline):
         self.mode = mode
         self._parent_fh = None
         self._child_fd = None
-        _validate_mode(mode, allow_append=False)
-        if mode[0] == "r":
+        if mode.find('a') >= 0:
+            raise PipettorException("can not specify stdout with read mode")
+        if mode.find('r') >= 0:
             if stdout is not None:
                 raise PipettorException("can not specify stdout with read mode")
         else:
@@ -710,7 +710,7 @@ class Popen(Pipeline):
                 raise PipettorException("can not specify stdin with write mode")
 
         pipe_read_fd, pipe_write_fd = os.pipe()
-        if mode[0] == "r":
+        if mode.find('r') >= 0:
             firstIn = stdin
             lastOut = pipe_write_fd
             self._child_fd = pipe_write_fd

@@ -209,7 +209,7 @@ class PipelineTests(PipettorTestBase):
         self.commonChecks(nopen, pl, "^cat -u <\\[DataWriter\\] \\| cat -u >\\[DataReader\\] 2>\\[DataReader\\]$", isRe=True)
 
     def testFileMode(self):
-        with six.assertRaisesRegex(self, PipettorException, "^invalid mode: 'q', expected 'r', 'w', or 'a' with optional 'b' suffix$"):
+        with six.assertRaisesRegex(self, PipettorException, "^invalid or unsupported mode 'q' opening /dev/null"):
             File("/dev/null", "q")
 
     def testCollectStdoutErr(self):
@@ -438,6 +438,20 @@ class PopenTests(PipettorTestBase):
             self.assertTrue(p.returncode == 1)
         self.commonChecks(nopen, pl, "^false >.+$", isRe=True)
 
+    simpleOneLines = ['one\n', 'two\n', 'three\n', 'four\n', 'five\n', 'six\n']
+
+    def testReadDos(self):
+        mode = "rU" if six.PY2 else "r"
+        with Popen(("cat", self.getInputFile("simple1.dos.txt")), mode=mode) as fh:
+            lines = [l for l in fh]
+        self.assertEqual(lines, self.simpleOneLines)
+
+    def testReadMac(self):
+        mode = "rU" if six.PY2 else "r"
+        with Popen(("cat", self.getInputFile("simple1.mac.txt")), mode=mode) as fh:
+            lines = [l for l in fh]
+        self.assertEqual(lines, self.simpleOneLines)
+
     def testSigPipe(self):
         # test not reading all of pipe output
         nopen = self.numOpenFiles()
@@ -507,7 +521,6 @@ class FunctionTests(PipettorTestBase):
         out = runlexout("sort -r", stdin=inf)
         self.assertEqual(out, "two\nthree\nsix\none\nfour\nfive\n")
         self.orphanChecks(nopen)
-
 
 def suite():
     ts = unittest.TestSuite()

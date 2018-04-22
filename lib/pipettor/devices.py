@@ -5,7 +5,6 @@ pipettor interfaces to files and pipes, as well as some other IPC stuff.
 from __future__ import print_function
 import six
 import os
-import re
 import fcntl
 import errno
 import threading
@@ -23,17 +22,6 @@ from pipettor.exceptions import PipettorException
 #
 #  http://bugs.python.org/issue21822
 #  http://code.activestate.com/recipes/496735-workaround-for-missed-sigint-in-multithreaded-prog/
-
-
-_rwa_re = re.compile("^[rwa]b?$")
-_rw_re = re.compile("^[rw]b?$")
-
-
-def _validate_mode(mode, allow_append):
-    mode_re = _rwa_re if allow_append else _rw_re
-    if mode_re.match(mode) is None:
-        expect = "'r', 'w', or 'a'" if allow_append else "'r' or 'w'"
-        raise PipettorException("invalid mode: '{}', expected {} with optional 'b' suffix".format(mode, expect))
 
 
 def _open_compat(fd_or_path, mode, buffering=-1, encoding=None, errors=None):
@@ -232,7 +220,7 @@ class DataWriter(Dev):
 
 class File(Dev):
     """A file path for input or output, used for specifying stdio associated
-    with files. Mode starts with standard r, w, or a"""
+    with files. Mode is invalued on of standard r, w, or a"""
 
     def __init__(self, path, mode="r"):
         super(File, self).__init__()
@@ -240,13 +228,14 @@ class File(Dev):
         self._mode = mode
         # only one of the file descriptors is ever opened
         self.read_fd = self.write_fd = None
-        _validate_mode(mode, allow_append=True)
-        if self._mode[0] == 'r':
+        if mode.find('r') >= 0:
             self.read_fd = os.open(self._path, os.O_RDONLY)
-        elif self._mode[0] == 'w':
+        elif mode.find('w') >= 0:
             self.write_fd = os.open(self._path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o666)
-        else:
+        elif mode.find('a') >= 0:
             self.write_fd = os.open(self._path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o666)
+        else:
+            raise PipettorException("invalid or unsupported mode '{}' opening {}".format(mode, path))
 
     def __str__(self):
         return self._path
