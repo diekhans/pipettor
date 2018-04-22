@@ -522,6 +522,7 @@ class FunctionTests(PipettorTestBase):
         self.assertEqual(out, "two\nthree\nsix\none\nfour\nfive\n")
         self.orphanChecks(nopen)
 
+
 def suite():
     ts = unittest.TestSuite()
     ts.addTest(unittest.makeSuite(PipelineTests))

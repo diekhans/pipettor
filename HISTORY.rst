@@ -3,6 +3,12 @@
 History
 =======
 
+0.4.0 (2018-04-21)
+------------------
+* Allow passing through universial newline mode for PY2.
+* Fix bug with not using specified log level.
+
+
 0.3.0 (2018-02-25)
 -----------------------
 * added open-stying buffering, encoding, and errors options

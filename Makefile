@@ -2,6 +2,14 @@
 
 PYTHON = python2.7
 
+coverage = ${PYTHON} -m coverage
+
+ifeq ($(shell uname),Darwin)
+  browser = open
+else
+  browser = true
+endif
+
 .PHONY: help clean clean-build clean-pyc clean-docs clean-tests \
 	lint test test-all coverage \
 	docs docs-open \
@@ -76,10 +84,10 @@ test-all:
 	tox
 
 coverage:
-	coverage run --source pipettor setup.py test
-	coverage report -m
-	coverage html
-	$(BROWSER) htmlcov/index.html
+	${coverage} run --source pipettor setup.py test
+	${coverage} report -m
+	${coverage} html
+	${browser} htmlcov/index.html
 
 docs:
 	rm -f docs/pipettor.rst
@@ -89,7 +97,7 @@ docs:
 	$(MAKE) -C docs html
 
 docs-open: docs
-	open docs/_build/html/index.html
+	${browser} docs/_build/html/index.html
 
 install: clean
 	${PYTHON} setup.py install
