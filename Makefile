@@ -3,6 +3,7 @@
 PYTHON = python2.7
 
 coverage = ${PYTHON} -m coverage
+twine = ${PYTHON} -m twine
 
 ifeq ($(shell uname),Darwin)
   browser = open
@@ -115,7 +116,7 @@ test-pip: dist
 
 # test release to pypitest
 test-release: dist
-	twine upload --repository=pypitest dist/pipettor-*.whl dist/pipettor-*.tar.gz
+	${twine} upload --repository=pypitest dist/pipettor-*.whl dist/pipettor-*.tar.gz
 
 # test release install from pypitest
 test-release-pip:
@@ -124,5 +125,5 @@ test-release-pip:
 	${envact} && ${PYTHON} ../tests/pipettorTests.py
 
 release: dist
-	twine upload --repository=pypi dist/pipettor-*.whl dist/pipettor-*.tar.gz
+	${twine} upload --repository=pypi dist/pipettor-*.whl dist/pipettor-*.tar.gz
 
