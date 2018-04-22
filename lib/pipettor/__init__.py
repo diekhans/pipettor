@@ -11,7 +11,7 @@ from pipettor.processes import Pipeline, Popen, setDefaultLogger, getDefaultLogg
 __version__ = "0.4.0"
 
 
-def run(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None):
+def run(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLevel=None):
     """Construct and run an process pipeline. If any of the processes fail,
     a ProcessException is throw.
 
@@ -30,12 +30,8 @@ def run(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None):
     if an occurs in that process.  If an instance of
     :class:`pipettor.DataReader` is provided, the contents of stderr from all
     process will be included in the exception.
-
-    The logger argument can be the name of a logger or a logger object.
-    Logging of process execution is done at INFO level and errors at ERROR
-    level.
     """
-    Pipeline(cmds, stdin=stdin, stdout=stdout, stderr=stderr, logger=logger).wait()
+    Pipeline(cmds, stdin=stdin, stdout=stdout, stderr=stderr, logger=logger, logLevel=logLevel).wait()
 
 
 def runout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None,
@@ -75,12 +71,8 @@ def runlex(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLev
     process.  If `cmds` is a list, a multi-process pipeline is created.
     Elements that are strings are split into arguments to form commands.
     Elements that are lists are treated as commands without splitting.
-
-    The logger argument can be the name of a logger or a logger object.
-    Logging of process execution is done at INFO level and errors at ERROR
-    level.
     """
-    run(_lexcmds(cmds), stdin=stdin, stdout=stdout, stderr=stderr, logger=logger)
+    run(_lexcmds(cmds), stdin=stdin, stdout=stdout, stderr=stderr, logger=logger, logLevel=None)
 
 
 def runlexout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None,
