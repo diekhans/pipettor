@@ -207,7 +207,7 @@ class PipelineTests(PipettorTestBase):
         self.commonChecks(nopen, pl, "^cat -u <\\[DataWriter\\] \\| cat -u >\\[DataReader\\] 2>\\[DataReader\\]$", isRe=True)
 
     def testFileMode(self):
-        with six.assertRaisesRegex(self, PipettorException, "^invalid mode: 'q', expected 'r', 'w', or 'a' with optional 'b' suffix$"):
+        with six.assertRaisesRegex(self, PipettorException, "^invalid mode: 'q', expected 'r', 'w', or 'a' with optional 'b' or 'U' suffix$"):
             File("/dev/null", "q")
 
     def testCollectStdoutErr(self):

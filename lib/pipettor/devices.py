@@ -25,15 +25,16 @@ from pipettor.exceptions import PipettorException
 #  http://code.activestate.com/recipes/496735-workaround-for-missed-sigint-in-multithreaded-prog/
 
 
-_rwa_re = re.compile("^[rwa]b?$")
-_rw_re = re.compile("^[rw]b?$")
+# `U' is allowed for PY2 compatiability
+_rwa_re = re.compile("^[rwa][bU]?$")
+_rw_re = re.compile("^[rw][bU]?$")
 
 
 def _validate_mode(mode, allow_append):
     mode_re = _rwa_re if allow_append else _rw_re
     if mode_re.match(mode) is None:
         expect = "'r', 'w', or 'a'" if allow_append else "'r' or 'w'"
-        raise PipettorException("invalid mode: '{}', expected {} with optional 'b' suffix".format(mode, expect))
+        raise PipettorException("invalid mode: '{}', expected {} with optional 'b' or 'U' suffix".format(mode, expect))
 
 
 def _open_compat(fd_or_path, mode, buffering=-1, encoding=None, errors=None):
