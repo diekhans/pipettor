@@ -1,8 +1,6 @@
 """
 Robust, easy to use Unix process pipelines.
 """
-from __future__ import print_function
-import six
 import shlex
 from pipettor.exceptions import PipettorException, ProcessException
 from pipettor.devices import DataReader, DataWriter, File
@@ -57,10 +55,10 @@ def runout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None,
 
 def _lexcmds(cmds):
     """spit pipeline specification into arguments"""
-    if isinstance(cmds, six.string_types):
+    if isinstance(cmds, str):
         return shlex.split(cmds)
     else:
-        return [shlex.split(cmd) if isinstance(cmd, six.string_types) else cmd for cmd in cmds]
+        return [shlex.split(cmd) if isinstance(cmd, str) else cmd for cmd in cmds]
 
 
 def runlex(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLevel=None):

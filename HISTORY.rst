@@ -3,6 +3,13 @@
 History
 =======
 
+x.x.x
+-----------------
+* Removed Python-2 support.
+* Switch to using subprocess as a base rather interface directly
+  interface with Unix system calls.  This lets subprocess deal with
+  various issues dealing with the Python interpreter environment.  
+
 0.4.0 (2018-04-21)
 ------------------
 * Allow passing through universial newline mode for PY2.

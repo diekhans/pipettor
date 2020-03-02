@@ -1,5 +1,4 @@
 # Copyright 2006-2015 Mark Diekhans
-from __future__ import print_function
 import os
 import sys
 import unittest
@@ -8,10 +7,8 @@ import threading
 import errno
 import re
 import glob
+import io
 import logging
-import six
-
-xrange = six.moves.builtins.range
 
 try:
     MAXFD = os.sysconf("SC_OPEN_MAX")
@@ -51,12 +48,12 @@ def ensureFileDir(fname):
         return "."
 
 
-class TestLogging():
+class LoggerForTests():
     """test logger that logs to memory, each instance has a new logger"""
     def __init__(self, level=logging.DEBUG):
         self.logger = logging.getLogger(str(id(self)))
         self.logger.setLevel(level)
-        self.__buffer = six.StringIO()
+        self.__buffer = io.StringIO()
         self.logger.addHandler(logging.StreamHandler(self.__buffer))
 
     @property
@@ -201,7 +198,7 @@ class TestCaseBase(unittest.TestCase):
         "get the number of threads that are running"
         n = 0
         for t in threading.enumerate():
-            if t.isAlive():
+            if t.is_alive():
                 n += 1
         return n
 
@@ -225,7 +222,7 @@ class TestCaseBase(unittest.TestCase):
     def numOpenFiles():
         "count the number of open files"
         n = 0
-        for fd in xrange(0, MAXFD):
+        for fd in range(0, MAXFD):
             try:
                 os.fstat(fd)
             except OSError:

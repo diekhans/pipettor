@@ -1,5 +1,4 @@
 # Copyright 2006-2016 Mark Diekhans
-from __future__ import print_function
 import sys
 import traceback
 import signal
