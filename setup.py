@@ -22,7 +22,7 @@ test_requirements = [
 
 setup(
     name = 'pipettor',
-    version = '0.4.0',
+    version = '0.5.0',
     description = "pipettor - robust, easy to use Unix process pipelines",
     long_description = readme + '\n\n' + history,
     author = "Mark Diekhans",

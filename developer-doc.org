@@ -30,7 +30,7 @@ make test-release-pip
 ** one time setup:
 python setup.py register -r pypi
 ** do all of the above testing
-** WARNING: may have to update git tag if any 
+** WARNING: may have to update git tag if any things fixed
 ** update HISTORY.rst
 ** Do the git duty
 bumpversion major|minor|patch
