@@ -8,8 +8,7 @@ Features
 --------
 
 * Creating process pipelines in Python is either complex (e.g. ``subprocess``),
-  or not robust (e.g. ``os.system()``).  This package provides aims to address
-  these shortcomings.
+  or not robust (e.g. ``os.system()``).  This package aims to address these shortcomings.
 * Command pipelines are simply specified as a sequence of commands, with each
   command represented as a sequence of arguments.
 * Failure of any process in the pipeline results in an exception, with ``stderr``
@@ -19,6 +18,6 @@ Features
 * Asynchronous reading and writing to and from the pipeline maybe done without risk of
   deadlock.
 * Pipeline can run asynchronously or block until completion.
-* File-like objects for reading or writing a pipeline.
+* Popen-style File-like objects for reading or writing a pipeline.
 * Documentation: https://pipettor.readthedocs.org.
 
