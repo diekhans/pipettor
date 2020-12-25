@@ -217,7 +217,7 @@ class Process(object):
     def _waitpid(self, flag=0):
         "Do waitpid and handle exit if finished, return True if finished"
         if self.pid is None:
-            raise PipettorException("process has not be started")
+            raise PipettorException("process has not been started")
         w = os.waitpid(self.pid, flag)
         if w[0] != 0:
             self._handle_exit(w[1])
