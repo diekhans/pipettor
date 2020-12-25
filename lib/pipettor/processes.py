@@ -370,10 +370,6 @@ class Pipeline(object):
             desc += " 2>" + str(self.stderr)
         return desc
 
-    def _post_fork_parent(self):
-        for d in self.devs:
-            d._post_fork_parent()
-
     def _start_process(self, proc):
         proc._start(self.pgid)
         self.bypid[proc.pid] = proc
