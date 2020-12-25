@@ -559,7 +559,7 @@ class Popen(Pipeline):
         self._parent_fh = None
         self._child_fd = None
         if mode.find('a') >= 0:
-            raise PipettorException("can not specify stdout with read mode")
+            raise PipettorException("can not specify append mode")
         if mode.find('r') >= 0:
             if stdout is not None:
                 raise PipettorException("can not specify stdout with read mode")
