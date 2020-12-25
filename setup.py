@@ -15,11 +15,9 @@ with open('HISTORY.rst') as history_file:
     history = history_file.read().replace('.. :changelog:', '')
 
 requirements = [
-    "six"
 ]
 
 test_requirements = [
-    "six"
 ]
 
 setup(
@@ -44,14 +42,12 @@ setup(
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
         'Natural Language :: English',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
         'Operating System :: POSIX',
         'Operating System :: MacOS :: MacOS X',
         'Topic :: Software Development :: Libraries :: Python Modules'
     ],
-    test_suite = 'tests',
-    tests_require = test_requirements
 )

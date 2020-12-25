@@ -1,6 +1,6 @@
 # -*- mode: makefile-gmake  -*-
 
-PYTHON = python2.7
+PYTHON = python3
 
 coverage = ${PYTHON} -m coverage
 twine = ${PYTHON} -m twine
@@ -12,7 +12,7 @@ else
 endif
 
 .PHONY: help clean clean-build clean-pyc clean-docs clean-tests \
-	lint test test-all coverage \
+	lint vulture test test-all coverage \
 	docs docs-open \
 	install \
 	dist test-pip \
@@ -38,6 +38,7 @@ help:
 	@echo "clean-docs - remove generated documentation"
 	@echo "clean-test - remove test and coverage artifacts"
 	@echo "lint - check style with flake8"
+	@echo "vulture - check for unused code"
 	@echo "test - run tests quickly with the default Python"
 	@echo "test-all - run tests on every Python version with tox"
 	@echo "coverage - check code coverage quickly with the default Python"
@@ -76,10 +77,14 @@ clean-test:
 	rm -fr htmlcov/
 
 lint:
-	flake8 lib/pipettor tests
+	${PYTHON} -m flake8 lib/pipettor tests
 
+vulture:
+	${PYTHON} -m vulture lib/pipettor tests
+
+pytestOpts = --tb=native -rsx
 test:
-	${PYTHON} setup.py test
+	PYTHONPATH=lib:${PYTHONPATH} ${PYTHON} -m pytest ${pytestOpts} tests
 
 test-all:
 	tox
