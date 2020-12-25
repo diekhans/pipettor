@@ -1,6 +1,6 @@
 # -*- mode: makefile-gmake  -*-
 
-PYTHON = python3
+PYTHON ?= python3
 
 coverage = ${PYTHON} -m coverage
 twine = ${PYTHON} -m twine
@@ -84,7 +84,7 @@ vulture:
 
 pytestOpts = --tb=native -rsx
 test:
-	PYTHONPATH=lib:${PYTHONPATH} ${PYTHON} -m pytest ${pytestOpts} tests
+	PYTHONPATH=lib:${PYTHONPATH} ${PYTHON} -W always -m pytest ${pytestOpts} tests
 
 test-all:
 	tox
