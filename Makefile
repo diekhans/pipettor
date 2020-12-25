@@ -117,7 +117,7 @@ dist: clean
 test-pip: dist
 	${envsetup}
 	${envact} && pip install --no-cache-dir ../dist/pipettor-*.tar.gz
-	${envact} && ${PYTHON} ../tests/pipettorTests.py
+	${envact} && ${PYTHON} ../tests/test_pipettor.py
 
 # test release to pypitest
 test-release: dist
@@ -127,7 +127,7 @@ test-release: dist
 test-release-pip:
 	${envsetup}
 	${envact} && pip install --no-cache-dir --index-url=${pypitest_url} pipettor
-	${envact} && ${PYTHON} ../tests/pipettorTests.py
+	${envact} && ${PYTHON} ../tests/test_pipettor.py
 
 release: dist
 	${twine} upload --repository=pypi dist/pipettor-*.whl dist/pipettor-*.tar.gz
