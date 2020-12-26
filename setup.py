@@ -2,10 +2,7 @@
 # -*- coding: utf-8 -*-
 
 
-try:
-    from setuptools import setup
-except ImportError:
-    from distutils.core import setup
+import setuptools
 
 
 with open('README.rst') as readme_file:
@@ -17,14 +14,12 @@ with open('HISTORY.rst') as history_file:
 requirements = [
 ]
 
-test_requirements = [
-]
-
-setup(
+setuptools.setup(
     name = 'pipettor',
     version = '0.5.0',
     description = "pipettor - robust, easy to use Unix process pipelines",
     long_description = readme + '\n\n' + history,
+    long_description_content_type="text/markdown",
     author = "Mark Diekhans",
     author_email = 'markd@soe.ucsc.edu',
     url = 'https://github.com/diekhans/pipettor',
@@ -36,7 +31,7 @@ setup(
     install_requires = requirements,
     license = "MIT",
     zip_safe = True,
-    keywords = ['process', 'pipe'],
+    keywords = ['Unix', 'process', 'pipe'],
     classifiers = [
         'Development Status :: 4 - Beta',
         'Intended Audience :: Developers',
@@ -50,4 +45,5 @@ setup(
         'Operating System :: MacOS :: MacOS X',
         'Topic :: Software Development :: Libraries :: Python Modules'
     ],
+    python_requires='>=3.6',
 )
