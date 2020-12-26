@@ -3,7 +3,7 @@
 History
 =======
 
-x.x.x
+0.5.0 (2020-12-25)
 -----------------
 * Removed Python-2 support.
 * Switch to using subprocess as a base rather interface directly

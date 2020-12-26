@@ -121,7 +121,7 @@ test-pip: dist
 
 # test release to pypitest
 test-release: dist
-	${twine} upload --repository=pypitest dist/pipettor-*.whl dist/pipettor-*.tar.gz
+	${twine} upload --repository=testpypi dist/pipettor-*.whl dist/pipettor-*.tar.gz
 
 # test release install from pypitest
 test-release-pip:

@@ -33,10 +33,12 @@ python setup.py register -r pypi
 ** WARNING: may have to update git tag if any things fixed
 ** update HISTORY.rst
 ** Do the git duty
-bumpversion major|minor|patch
-commit to master
-git push origin --tags
-git push
+- bumpversion major|minor|patch
+  or 
+- manually add tag in the form v0.4.0 if version already bumped
+- commit to master
+- git push origin --tags
+- git push
 ** make release
 ** git push origin --tags
 ** git status  # make sure origin is in sync
