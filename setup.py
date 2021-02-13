@@ -21,7 +21,7 @@ setuptools.setup(
     long_description = readme + '\n\n' + history,
     long_description_content_type="text/markdown",
     author = "Mark Diekhans",
-    author_email = 'markd@soe.ucsc.edu',
+    author_email = 'markd@ucsc.edu',
     url = 'https://github.com/diekhans/pipettor',
     packages = [
         'pipettor',
@@ -33,7 +33,7 @@ setuptools.setup(
     zip_safe = True,
     keywords = ['Unix', 'process', 'pipe'],
     classifiers = [
-        'Development Status :: 4 - Beta',
+        'Development Status :: 5 - Production/Stable',
         'Intended Audience :: Developers',
         'License :: OSI Approved :: MIT License',
         'Natural Language :: English',
