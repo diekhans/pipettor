@@ -45,5 +45,5 @@ setuptools.setup(
         'Operating System :: MacOS :: MacOS X',
         'Topic :: Software Development :: Libraries :: Python Modules'
     ],
-    python_requires='>=3.6',
+    python_requires='>=3.7',
 )
