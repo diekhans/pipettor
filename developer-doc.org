@@ -15,20 +15,14 @@ or on Mac OS/X
   make docs-open  
 
 * test pip with testpypi
-** one time setup:
-python setup.py register -r pypitest
-
 ** Update the version in code, but don't change git.  Version number needed for testing pip, however this might result in changes
 bumpversion --allow-dirty --no-commit --no-tag major|minor|patch
 ** testing pip install using pypitest.  Must bump version for retesting:
-make test-release
+make release-testpypi
 ** test release install from pypitest in virtualenv
-make test-release-pip
-
+make test-release-testpypi
 
 * Release process:
-** one time setup:
-python setup.py register -r pypi
 ** do all of the above testing
 ** WARNING: may have to update git tag if any things fixed
 ** update HISTORY.rst
@@ -43,4 +37,4 @@ python setup.py register -r pypi
 ** git push origin --tags
 ** git status  # make sure origin is in sync
 ** update readthedocs version in GUI
-** test release install
+** make test-release

@@ -5,6 +5,8 @@ PYTHON ?= python3
 coverage = ${PYTHON} -m coverage
 twine = ${PYTHON} -m twine
 
+version = $(shell PYTHONPATH=lib ${PYTHON} -c "import pipettor; print(pipettor.__version__)")
+
 ifeq ($(shell uname),Darwin)
   browser = open
 else
@@ -22,7 +24,7 @@ endif
 testenv = testenv
 
 pypi_url = https://upload.pypi.org/simple/
-pypitest_url = https://test.pypi.org/simple/
+testpypi_url = https://test.pypi.org/simple/
 
 define envsetup
 	@rm -rf ${testenv}
@@ -47,9 +49,10 @@ help:
 	@echo "install - install the package to the active Python's site-packages"
 	@echo "dist - package"
 	@echo "test-pip - test install the package using pip"
-	@echo "test-release - test upload to pypitest"
-	@echo "test-release-pip - install from pypitest"
+	@echo "release-testpypi - test upload to testpypi"
+	@echo "test-release-testpypi - install from testpypi"
 	@echo "release - package and upload a release"
+	@echo "test-release - test final release"
 
 clean: clean-build clean-pyc clean-test clean-docs
 
@@ -116,19 +119,25 @@ dist: clean
 # test install locally
 test-pip: dist
 	${envsetup}
-	${envact} && pip install --no-cache-dir ../dist/pipettor-*.tar.gz
+	${envact} && pip install --no-cache-dir ../dist/pipettor-${version}.tar.gz
 	${envact} && ${PYTHON} ../tests/test_pipettor.py
 
-# test release to pypitest
-test-release: dist
-	${twine} upload --repository=testpypi dist/pipettor-*.whl dist/pipettor-*.tar.gz
+# test release to testpypi
+release-testpypi: dist
+	${twine} upload --repository=testpypi dist/pipettor-${version}.whl dist/pipettor-${version}.tar.gz
 
-# test release install from pypitest
-test-release-pip:
+# test release install from testpypi
+test-release-testpypi:
 	${envsetup}
-	${envact} && pip install --no-cache-dir --index-url=${pypitest_url} pipettor
+	${envact} && pip install --no-cache-dir --index-url=${testpypi_url} pipettor==${version}
 	${envact} && ${PYTHON} ../tests/test_pipettor.py
 
 release: dist
-	${twine} upload --repository=pypi dist/pipettor-*.whl dist/pipettor-*.tar.gz
+	${twine} upload --repository=pypi dist/pipettor-${version}.whl dist/pipettor-${version}.tar.gz
+
+release-test:
+	${envsetup}
+	${envact} && pip install --no-cache-dir pipettor==${version}
+	${envact} && ${PYTHON} ../tests/test_pipettor.py
+
 
