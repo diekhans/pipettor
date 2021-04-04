@@ -1,5 +1,5 @@
 Pipettor Overview
-===============================
+=================
 
 pipettor - robust, easy to use Python package for running Unix process pipelines
 

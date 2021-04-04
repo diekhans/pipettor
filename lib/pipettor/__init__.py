@@ -16,7 +16,7 @@ def run(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLevel=
     `cmds` is either a list of arguments for a single process, or a list of
     such lists for a pipeline. If the `stdin`, `stdout`, or `stderr` arguments
     are none, the open files are are inherited.  Otherwise they can be string
-    file names, file-like objects, file number, or :class:`pipettor.Dev``
+    file names, file-like objects, file number, or :class:`pipettor.Dev`
     object.  `stdin` is input to the first process, `stdout` is output to the
     last process and `stderr` is attached to all processed.
     :class:`pipettor.DataReader` and :class:`pipettor.DataWriter` objects can
