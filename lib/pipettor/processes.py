@@ -206,7 +206,7 @@ class Process(object):
     def _handle_exit(self, waitStat):
         """Handle process exiting, saving status  """
         self.state = State.FINISHED
-        assert(os.WIFEXITED(waitStat) or os.WIFSIGNALED(waitStat))
+        assert os.WIFEXITED(waitStat) or os.WIFSIGNALED(waitStat)
         self.returncode = os.WEXITSTATUS(waitStat) if os.WIFEXITED(waitStat) else -os.WTERMSIG(waitStat)
         # must tell subprocess.Popen about this
         self.popen.returncode = self.returncode

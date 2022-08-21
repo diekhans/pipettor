@@ -80,7 +80,7 @@ clean-test:
 	rm -fr htmlcov/
 
 lint:
-	${PYTHON} -m flake8 lib/pipettor tests
+	${PYTHON} -m flake8 --color=never lib/pipettor tests
 
 vulture:
 	${PYTHON} -m vulture lib/pipettor tests
