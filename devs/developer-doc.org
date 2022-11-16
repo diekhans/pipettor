@@ -32,8 +32,8 @@ make test-release-testpypi
 - commit to master
 - git push origin --tags
 - git push
+- git status  # make sure origin is in sync
 ** make release
-** git push origin --tags
-** git status  # make sure origin is in sync
 ** update readthedocs version in GUI
-** make test-release
+** make release-test
+might have to wait a minute for it to become live
