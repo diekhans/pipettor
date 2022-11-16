@@ -122,9 +122,12 @@ test-pip: dist
 	${envact} && pip install --no-cache-dir ../dist/pipettor-${version}.tar.gz
 	${envact} && ${PYTHON} ../tests/test_pipettor.py
 
+dist_wheel = dist/pipettor-${version}-py3-none-any.whl
+dist_tar = dist/pipettor-${version}.tar.gz
+
 # test release to testpypi
 release-testpypi: dist
-	${twine} upload --repository=testpypi dist/pipettor-${version}.whl dist/pipettor-${version}.tar.gz
+	${twine} upload --repository=testpypi ${dist_wheel} ${dist_tar}
 
 # test release install from testpypi
 test-release-testpypi:
@@ -133,7 +136,7 @@ test-release-testpypi:
 	${envact} && ${PYTHON} ../tests/test_pipettor.py
 
 release: dist
-	${twine} upload --repository=pypi dist/pipettor-${version}.whl dist/pipettor-${version}.tar.gz
+	${twine} upload --repository=pypi ${dist_wheel} ${dist_tar}
 
 release-test:
 	${envsetup}
