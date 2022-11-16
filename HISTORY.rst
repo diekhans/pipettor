@@ -3,11 +3,16 @@
 History
 =======
 
+0.6.0 (2022-11-16)
+-----------------
+* remove use of deprecated pipes module
+
+
 0.5.0 (2020-12-25)
 -----------------
 * Removed Python-2 support.
 * Switch to using subprocess as a base rather interface directly
-  interface with Unix system calls.  This lets subprocess deal with
+  with Unix system calls.  This lets subprocess deal with
   various issues dealing with the Python interpreter environment.  
 
 0.4.0 (2018-04-21)

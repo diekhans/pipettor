@@ -4,7 +4,7 @@ Robust, easy to use Unix process pipelines.
 """
 import os
 import signal
-import pipes
+import shlex
 import logging
 import subprocess
 import enum
@@ -114,7 +114,7 @@ class Process(object):
 
     def __str__(self):
         "get simple description of process"
-        return " ".join([pipes.quote(str(arg)) for arg in self.cmd])
+        return " ".join([shlex.quote(str(arg)) for arg in self.cmd])
 
     def _stdio_assoc(self, spec, mode):
         """pre-fork check a stdio spec validity and associate Dev or file
