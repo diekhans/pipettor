@@ -101,7 +101,7 @@ class Process(object):
         self.stdin = self._stdio_assoc(stdin, "r")
         self.stdout = self._stdio_assoc(stdout, "w")
         if stderr == DataReader:
-            stderr = DataReader()
+            stderr = DataReader(errors='backslashreplace')
         self.stderr = self._stdio_assoc(stderr, "w")
         self.popen = None
         self.pid = None
