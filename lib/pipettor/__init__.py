@@ -43,9 +43,9 @@ def runout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None,
     The logger argument can be the name of a logger or a logger object.  If
     none, default is user.
 
-    Specifying binary access results in data of type bytes, otherwise str type is return.
-    The buffering, encoding, and errors arguments are as used
-    in the  open() function.
+    Specifying binary access results in data of type bytes, otherwise str type
+    is return.  The buffering, encoding, and errors arguments are as used in
+    the open() function.
     """
     dr = DataReader(buffering=buffering, encoding=encoding, errors=errors)
     Pipeline(cmds, stdin=stdin, stdout=dr, stderr=stderr, logger=logger, logLevel=logLevel).wait()

@@ -60,9 +60,9 @@ class DataReader(Dev):
     thread is use to prevent deadlock when both reading and writing to a child
     pipeline.
 
-    For Python3, specifying binary results in data of type bytes, otherwise
-    str.  The buffering, encoding, and errors arguments are as used in the
-    Python 3 open() function.  With Python 2, encoding and error is ignored.
+    Specifying binary access results in data of type bytes, otherwise str type
+    is returned.  The buffering, encoding, and errors arguments are as used in
+    the open() function.
     """
     def __init__(self, binary=False, buffering=-1, encoding=None, errors=None):
         super(DataReader, self).__init__()
@@ -124,9 +124,8 @@ class DataWriter(Dev):
     thread is use to prevent deadlock when both reading and writing to a child
     pipeline.  Text or binary output is determined by the type of data.
 
-    For Python3, binary results in data of type bytes, otherwise str.  The
-    buffering, encoding, and errors arguments are as used in the Python 3
-    open() function.
+    The buffering, encoding, and errors arguments are as used in
+    the open() function.
     """
 
     def __init__(self, data, buffering=-1, encoding=None, errors=None):
