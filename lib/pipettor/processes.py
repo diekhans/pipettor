@@ -548,9 +548,9 @@ class Popen(Pipeline):
     The logger argument can be the name of a logger or a logger object.  If
     none, default is user.
 
-    For Python3, specifying binary access results in data of type bytes,
-    otherwise str.  The buffering, encoding, and errors arguments are as used
-    in the Python 3 open() function.
+    Specifying binary access results in data of type bytes, otherwise str type
+    is returned.  The buffering, encoding, and errors arguments are as used in
+    the open() function.
     """
 
     def __init__(self, cmds, mode='r', stdin=None, stdout=None, logger=None, logLevel=None,

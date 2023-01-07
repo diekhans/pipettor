@@ -43,10 +43,9 @@ def runout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None,
     The logger argument can be the name of a logger or a logger object.  If
     none, default is user.
 
-    For Python3, specifying binary access results in data of type bytes,
-    otherwise str.  The buffering, encoding, and errors arguments are as used
-    in the Python 3 open() function.  With Python 2, encoding and error is
-    ignored.
+    Specifying binary access results in data of type bytes, otherwise str type is return.
+    The buffering, encoding, and errors arguments are as used
+    in the  open() function.
     """
     dr = DataReader(buffering=buffering, encoding=encoding, errors=errors)
     Pipeline(cmds, stdin=stdin, stdout=dr, stderr=stderr, logger=logger, logLevel=logLevel).wait()
@@ -86,10 +85,9 @@ def runlexout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None,
     The logger argument can be the name of a logger or a logger object.  If
     none, default is user.
 
-    For Python3, specifying binary access results in data of type bytes,
-    otherwise str.  The buffering, encoding, and errors arguments are as used
-    in the Python 3 open() function.  With Python 2, encoding and error is
-    ignored.
+    Specifying binary access results in data of type bytes, otherwise str type
+    is returned.  The buffering, encoding, and errors arguments are as used in
+    the open() function.
     """
     return runout(_lexcmds(cmds), stdin=stdin, stderr=stderr, logger=logger, logLevel=logLevel,
                   buffering=buffering, encoding=encoding, errors=errors)
