@@ -3,6 +3,10 @@
 History
 =======
 
+0.7.0 (2023-01-06)
+-----------------
+* don't fail if invalid UTF-8 characters are written to capture stderr
+
 0.6.0 (2022-11-16)
 -----------------
 * remove use of deprecated pipes module

@@ -60,14 +60,14 @@ clean-build:
 	rm -fr build/
 	rm -fr dist/
 	rm -fr .eggs/
+	rm -fr .tox/
 	rm -fr ${testenv}/
-	find . -name '*.egg-info' -exec rm -fr {} +
-	find . -name '*.egg' -exec rm -f {} +
+	rm -fr pipettor.egg-info/
 
 clean-pyc:
-	find . -name '*.pyc' -exec rm -f {} +
-	find . -name '*.pyo' -exec rm -f {} +
-	find . -depth -name '__pycache__' -exec rm -fr {} +
+	rm -fr lib/pipettor/__pycache__
+	rm -fr tests/__pycache__
+
 
 clean-docs:
 	rm -f docs/pipettor.rst
