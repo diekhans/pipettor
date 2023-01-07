@@ -16,7 +16,7 @@ or on Mac OS/X
 
 * test pip with testpypi
 ** Update the version in code, but don't change git.  Version number needed for testing pip, however this might result in changes
-bumpversion --allow-dirty --no-commit --no-tag major|minor|patch
+bumpversion --allow-dirty --no-commit --no-tag 'major|minor|patch'
 ** testing pip install using pypitest.  Must bump version for retesting:
 make release-testpypi
 ** test release install from pypitest in virtualenv
