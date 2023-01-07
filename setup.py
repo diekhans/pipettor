@@ -16,7 +16,7 @@ requirements = [
 
 setuptools.setup(
     name = 'pipettor',
-    version = '0.6.0',
+    version = '0.7.0',
     description = "pipettor - robust, easy to use Unix process pipelines",
     long_description = readme + '\n\n' + history,
     long_description_content_type="text/markdown",
