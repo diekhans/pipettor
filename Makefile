@@ -60,7 +60,6 @@ clean-build:
 	rm -fr build/
 	rm -fr dist/
 	rm -fr .eggs/
-	rm -fr .tox/
 	rm -fr ${testenv}/
 	rm -fr pipettor.egg-info/
 
@@ -78,6 +77,7 @@ clean-test:
 	rm -fr .tox/
 	rm -f .coverage
 	rm -fr htmlcov/
+	rm -fr tests/output/
 
 lint:
 	${PYTHON} -m flake8 --color=never lib/pipettor tests
