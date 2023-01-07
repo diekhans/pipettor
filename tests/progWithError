@@ -1,8 +1,10 @@
 #!/bin/sh
+#  -*- coding: raw-text -*-
 # generates an error, include arguments if specified
 msg="THIS GOES TO STDERR"
 if [ $# -gt 0 ] ; then
     msg="${msg}: $*"
 fi
 echo "$msg" >&2
+echo "Invalid UTR-8: gcÿÿ" >&2
 exit 1
