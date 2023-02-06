@@ -8,6 +8,7 @@ import shlex
 import logging
 import subprocess
 import enum
+from io import UnsupportedOperation
 from threading import RLock
 from pipettor.devices import Dev
 from pipettor.devices import DataReader
@@ -553,10 +554,14 @@ class Popen(Pipeline):
     the open() function.
     """
 
+    # note: this follows I/O _pyio.py structure, but doesn't extend class
+    # due to it doing both binary and text I/O.  Probably could do this
+    # with some kind of dynamic base class setting.
+
     def __init__(self, cmds, mode='r', *, stdin=None, stdout=None, logger=None, logLevel=None,
                  buffering=-1, encoding=None, errors=None):
         self.mode = mode
-        self._parent_fh = None
+        self._pipeline_fh = None
         self._child_fd = None
         if mode.find('a') >= 0:
             raise PipettorException("can not specify append mode")
@@ -572,60 +577,147 @@ class Popen(Pipeline):
             firstIn = stdin
             lastOut = pipe_write_fd
             self._child_fd = pipe_write_fd
-            self._parent_fh = open(pipe_read_fd, mode, buffering=buffering, encoding=encoding, errors=errors)
+            self._pipeline_fh = open(pipe_read_fd, mode, buffering=buffering, encoding=encoding, errors=errors)
         else:
             firstIn = pipe_read_fd
             lastOut = stdout
             self._child_fd = pipe_read_fd
-            self._parent_fh = open(pipe_write_fd, mode, buffering=buffering, encoding=encoding, errors=errors)
+            self._pipeline_fh = open(pipe_write_fd, mode, buffering=buffering, encoding=encoding, errors=errors)
         super(Popen, self).__init__(cmds, stdin=firstIn, stdout=lastOut, logger=logger, logLevel=logLevel)
         self.start()
         os.close(self._child_fd)
         self._child_fd = None
 
+    ### Internal ###
+
     def _close(self):
-        if self._parent_fh is not None:
-            self._parent_fh.close()
-            self._parent_fh = None
+        if self._pipeline_fh is not None:
+            self._pipeline_fh.close()
+            self._pipeline_fh = None
         if self._child_fd is not None:
             os.close(self._child_fd)
             self._child_fd = None
 
+    def _unsupported(self, name):
+        """from _pyio.py: raise an OSError exception for unsupported operations."""
+        raise UnsupportedOperation("%s.%s() not supported" %
+                                   (self.__class__.__name__, name))
+
+    def _checkClosed(self, msg=None):
+        """Internal: raise a ValueError if file is closed
+        """
+        if self.closed:
+            raise ValueError("I/O operation on closed file."
+                             if msg is None else msg)
+
+    ### Positioning ###
+
+    def seek(self, pos, whence=0):
+        """Changing stream position not supported"""
+        self._unsupported("seek")
+
+    def tell(self):
+        """Return an int indicating the current stream position."""
+        return self._pipeline_fh.tell()
+
+    def truncate(self, pos=None):
+        """Truncate file unsupported"""
+        self._unsupported("truncate")
+
+    ### Flush and close ###
+
+    def flush(self):
+        "Flush the internal I/O buffer."
+        self._pipeline_fh.flush()
+
+    def close(self):
+        "wait for process to complete, with an error if it exited non-zero"
+        with self.lock:
+            self._close()
+            if self.state is not State.FINISHED:
+                self.wait()
+
+    def __del__(self):
+        """Destructor.  Calls close()."""
+        if self._pipeline_fh is not None:
+            self.close()
+
+    ### Inquiries ###
+
+    def seekable(self):
+        """Not seekable"""
+        return False
+
+    def readable(self):
+        """Return a bool indicating whether object was opened for reading."""
+        return self._pipeline_fh.readable()
+
+    def writable(self):
+        """Return a bool indicating whether object was opened for writing."""
+        return self._pipeline_fh.writable()
+
+    @property
+    def closed(self):
+        """closed: bool.  True if the file has been closed."""
+        if self._pipeline_fh is None:
+            return True
+        else:
+            return self._pipeline_fh.closed
+
+    ### Context manager ###
+
     def __enter__(self):
         "support for with statement"
+        self._checkClosed()
         return self
 
     def __exit__(self, type, value, traceback):
         "support for with statement"
         self.close()
 
-    def __iter__(self):
-        "iter over contents of file"
-        return self._parent_fh.__iter__()
-
-    def next(self):
-        return self._parent_fh.next()
-
-    def flush(self):
-        "Flush the internal I/O buffer."
-        self._parent_fh.flush()
+    ### Lower-level APIs ###
 
     def fileno(self):
         "get the integer OS-dependent file handle"
-        return self._parent_fh.fileno()
+        return self._pipeline_fh.fileno()
+
+    def isatty(self):
+        """Return a bool indicating whether this is an 'interactive' stream.
+        """
+        self._checkClosed()
+        return False
+
+    ### read, write and readline[s] and writelines ###
+
+    def read(self, size=-1):
+        return self._pipeline_fh.read(size)
+
+    def readline(self, size=-1):
+        return self._pipeline_fh.readline(size)
+
+    def readlines(self, size=-1):
+        return self._pipeline_fh.readlines(size)
+
+    def __iter__(self):
+        "iter over contents of file"
+        return self._pipeline_fh.__iter__()
+
+    def __next__(self):
+        return next(self._pipeline_fh)
 
     def write(self, str):
         "Write string str to file."
-        self._parent_fh.write(str)
+        self._pipeline_fh.write(str)
 
-    def read(self, size=-1):
-        return self._parent_fh.read(size)
+    def writelines(self, lines):
+        """Write a list of lines to the stream.
 
-    def readline(self, size=-1):
-        return self._parent_fh.readline(size)
+        Line separators are not added, so it is usual for each of the lines
+        provided to have a line separator at the end.
+        """
+        self._pipeline_fh.writelines(lines)
 
-    def readlines(self, size=-1):
-        return self._parent_fh.readlines(size)
+    ### not part of file-like ###
 
     def wait(self):
         """wait to for processes to complete, generate an exception if one
@@ -639,11 +731,4 @@ class Popen(Pipeline):
         # FIXME: don't know what to do about our open pipe keeping process from
         # exiting so we can get a status, so disallow it. Not sure how to
         # address this.  Can probably address this with select on pipe.
-        raise PipettorException("Pipeline.poll() is not supported")
-
-    def close(self):
-        "wait for process to complete, with an error if it exited non-zero"
-        with self.lock:
-            self._close()
-            if self.state is not State.FINISHED:
-                self.wait()
+        self._unsupported("poll")

@@ -3,6 +3,9 @@
 History
 =======
 
+0.8.0
+* make most optional arguments require keyword form to help prevent errors, especially if open() options are assumed
+
 0.7.0 (2023-01-06)
 -----------------
 * don't fail if invalid UTF-8 characters are written to capture stderr
