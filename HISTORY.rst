@@ -4,7 +4,9 @@ History
 =======
 
 0.8.0
+-----------------
 * make most optional arguments require keyword form to help prevent errors, especially if open() options are assumed
+* added more functions to make Popen objects file-like objects
 
 0.7.0 (2023-01-06)
 -----------------
