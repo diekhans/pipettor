@@ -64,7 +64,7 @@ class DataReader(Dev):
     is returned.  The buffering, encoding, and errors arguments are as used in
     the open() function.
     """
-    def __init__(self, binary=False, buffering=-1, encoding=None, errors=None):
+    def __init__(self, *, binary=False, buffering=-1, encoding=None, errors=None):
         super(DataReader, self).__init__()
         self.binary = binary
         self._process = None
@@ -128,7 +128,7 @@ class DataWriter(Dev):
     the open() function.
     """
 
-    def __init__(self, data, buffering=-1, encoding=None, errors=None):
+    def __init__(self, data, *, buffering=-1, encoding=None, errors=None):
         super(DataWriter, self).__init__()
         binary = not isinstance(data, str)
         self._data = data

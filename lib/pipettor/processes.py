@@ -272,7 +272,7 @@ class Pipeline(object):
     The logger argument can be the name of a logger or a logger object.  If
     none, default is user.
     """
-    def __init__(self, cmds, stdin=None, stdout=None, stderr=DataReader,
+    def __init__(self, cmds, *, stdin=None, stdout=None, stderr=DataReader,
                  logger=None, logLevel=None):
         self.lock = RLock()
         self.stdin = stdin
@@ -553,7 +553,7 @@ class Popen(Pipeline):
     the open() function.
     """
 
-    def __init__(self, cmds, mode='r', stdin=None, stdout=None, logger=None, logLevel=None,
+    def __init__(self, cmds, mode='r', *, stdin=None, stdout=None, logger=None, logLevel=None,
                  buffering=-1, encoding=None, errors=None):
         self.mode = mode
         self._parent_fh = None
