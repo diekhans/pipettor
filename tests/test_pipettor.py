@@ -360,7 +360,8 @@ class PopenTests(PipettorTestBase):
         pl.close()
         self.commonChecks(nopen, pl, "gzip -1 <.+ >.*output/test_pipettor.PopenTests.testWrite.out.gz", isRe=True)
 
-        Pipeline(("zcat", outfGz), stdout=outf).wait()
+        # macOS Ventura: don't used zcat; would need to use gzcat, but this is compatbile with all
+        Pipeline(("gunzip", "-c", outfGz), stdout=outf).wait()
         self.diffExpected(".out")
 
     def testWriteFile(self):
@@ -373,7 +374,8 @@ class PopenTests(PipettorTestBase):
             self.cpFileToPl("simple1.txt", pl)
             pl.wait()
 
-        Pipeline(("zcat", outfGz), stdout=outf).wait()
+        # macOS Ventura: don't used zcat; would need to use gzcat, but this is compatbile with all
+        Pipeline(("gunzip", "-c", outfGz), stdout=outf).wait()
         self.diffExpected(".out")
         self.commonChecks(nopen, pl, "gzip -1 <.* >.*output/test_pipettor.PopenTests.testWriteFile.out.gz", isRe=True)
 
