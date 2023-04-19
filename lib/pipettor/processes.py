@@ -151,6 +151,7 @@ class Process(object):
 
         # standard dance to get process group set
         # preexec_fn will go away: https://bugs.python.org/issue38435
+        # switch to using process_group (added in 3.11)
         if pgid is None:
             preexecFn = lambda: os.setpgid(os.getpid(), os.getpid())  # noqa
         else:
