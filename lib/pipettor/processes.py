@@ -18,11 +18,6 @@ from pipettor.exceptions import PipettorException
 from pipettor.exceptions import ProcessException
 from pipettor.exceptions import _warn_error_during_error_handling
 
-# FIXME: C-c problems:
-# http://code.activestate.com/recipes/496735-workaround-for-missed-sigint-in-multithreaded-prog/
-# http://bugs.python.org/issue21822
-# FIXME above handled by subprocess??
-
 _defaultLogger = None
 _defaultLogLevel = logging.DEBUG
 
@@ -106,7 +101,6 @@ class Process(object):
         self.stderr = self._stdio_assoc(stderr, "w")
         self.popen = None
         self.pid = None
-        self.pgid = None
         self.returncode = None  # exit code, or -signal
         # FIXME: should this just be exception for the users??
         self.procExcept = None  # exception because of failed process
@@ -144,36 +138,24 @@ class Process(object):
             # this should have been detected earlier
             raise PipettorException("_get_child_stdio logic error: {} {}".format(type(spec), stdfd))
 
-    def _start_process(self, pgid):
-        """Do work of starting the process.  If pgid is None, this process
-        becomes group leader, otherwise this process is added to group pgid."""
+    def _start_process(self):
+        """Do work of starting the process"""
         self.state = State.STARTUP    # do first to prevent restarts on error
-
-        # standard dance to get process group set
-        # preexec_fn will go away: https://bugs.python.org/issue38435
-        # switch to using process_group (added in 3.11)
-        if pgid is None:
-            preexecFn = lambda: os.setpgid(os.getpid(), os.getpid())  # noqa
-        else:
-            preexecFn = lambda: os.setpgid(os.getpid(), pgid)  # noqa
 
         try:
             self.popen = subprocess.Popen(self.cmd,
                                           stdin=self._get_child_stdio(self.stdin, 0),
                                           stdout=self._get_child_stdio(self.stdout, 1),
-                                          stderr=self._get_child_stdio(self.stderr, 2),
-                                          preexec_fn=preexecFn)
+                                          stderr=self._get_child_stdio(self.stderr, 2))
         except Exception as ex:
             raise ProcessException(str(self)) from ex
         self.pid = self.popen.pid
-        self.pgid = self.pid if pgid is None else pgid
         self.state = State.RUNNING
 
-    def _start(self, pgid):
-        """Start the process,  If pgid is None, this process
-        becomes group leader."""
+    def _start(self):
+        """Start the process,"""
         try:
-            self._start_process(pgid)
+            self._start_process()
         except BaseException as ex:
             self.procExcept = ex
         if self.procExcept is not None:
@@ -282,7 +264,6 @@ class Pipeline(object):
         self.stderr = stderr
         self.procs = []
         self.devs = set()
-        self.pgid = None       # process group leader
         self.bypid = dict()    # indexed by pid
         self.state = State.PREINIT
         self.logger = _getLoggerToUse(logger)
@@ -373,9 +354,8 @@ class Pipeline(object):
         return desc
 
     def _start_process(self, proc):
-        proc._start(self.pgid)
+        proc._start()
         self.bypid[proc.pid] = proc
-        self.pgid = proc.pgid
 
     def _start_processes(self):
         for proc in self.procs:

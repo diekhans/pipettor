@@ -19,7 +19,6 @@ Contents:
    authors
    history
    modules
-   design
 
 Indices and tables
 ==================
