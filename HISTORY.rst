@@ -3,6 +3,11 @@
 History
 =======
 
+1.0.0 (2023-06-29)
+-----------------
+* Don't use a process group; as it caused signals to not get propagated.  Processes are explicitly waited for by pid, so this will not consume the exit of other process not create by this module.
+  
+
 0.8.0 (2023-02-05)
 -----------------
 * make most optional arguments require keyword form to help prevent errors, especially if open() options are assumed
@@ -15,7 +20,6 @@ History
 0.6.0 (2022-11-16)
 -----------------
 * remove use of deprecated pipes module
-
 
 0.5.0 (2020-12-25)
 -----------------
