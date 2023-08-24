@@ -1,10 +1,6 @@
 * more extensive encoding tests
-* thread safety after open
-* change __ to _ in most cases
-* Gencode rsl STAR runs still hang on control-C
-and other cases
-* is Processed.force really useful?
+* is a RLock needed for devices objects?
 * figure out how to used _pyio.py ABS classes for processes.py
 to implement file-like objects instead of having copies.
-Hard part here is hard because of different classes
-for text vs binary.  Need to set base class dynamically.
+Hard part here is because of different classes
+for text vs binary.
