@@ -29,7 +29,7 @@ project_root = os.path.dirname(cwd)
 # Insert the project root dir src as the first element in the PYTHONPATH.
 # This lets us ensure that the source package is imported, and that its
 # version is used.
-sys.path.insert(0, os.path.join(project_root, "src"))
+sys.path.insert(0, os.path.join(project_root, "lib"))
 
 import pipettor
 
@@ -101,7 +101,7 @@ pygments_style = 'sphinx'
 
 # A list of ignored prefixes for module index sorting.
 #modindex_common_prefix = []
- 
+
 # If true, keep warnings as "system message" paragraphs in the built
 # documents.
 #keep_warnings = False
@@ -259,7 +259,7 @@ texinfo_documents = [
      u'pipettor Documentation',
      u'Mark Diekhans',
      'pipettor',
-     'One line description of project.',
+     'Robust, easy to use Python package for running Unix process pipelines.',
      'Miscellaneous'),
 ]
 
