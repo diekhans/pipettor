@@ -1,4 +1,4 @@
-# Copyright 2006-2016 Mark Diekhans
+# Copyright 2006-2025 Mark Diekhans
 import sys
 import traceback
 import signal

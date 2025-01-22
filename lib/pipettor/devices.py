@@ -1,4 +1,4 @@
-# Copyright 2006-2015 Mark Diekhans
+# Copyright 2006-2025 Mark Diekhans
 """
 pipettor interfaces to files and pipes, as well as some other IPC stuff.
 """

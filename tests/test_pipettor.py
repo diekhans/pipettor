@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# Copyright 2006-2015 Mark Diekhans
+# Copyright 2006-2025 Mark Diekhans
 import unittest
 import sys
 import os
