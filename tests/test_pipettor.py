@@ -5,6 +5,8 @@ import sys
 import os
 import re
 import signal
+from pathlib import Path
+
 if __name__ == '__main__':
     sys.path.insert(0, os.path.normpath(os.path.dirname(sys.argv[0])) + "/../lib")
     from testCaseBase import TestCaseBase, LoggerForTests
@@ -117,6 +119,16 @@ class PipelineTests(PipettorTestBase):
                          re.compile("""^start: false | true 2>[DataReader]\n"""
                                     """failure: false | true 2>[DataReader]: process exited 1: false\n.*""",
                                     re.MULTILINE))
+
+    def testPathObj(self):
+        nopen = self.numOpenFiles()
+        log = LoggerForTests()
+        true_path = Path("/usr/bin/true")
+        pl = Pipeline([(true_path,), (true_path,)], logger=log.logger)
+        pl.wait()
+        self.commonChecks(nopen, pl, "/usr/bin/true | /usr/bin/true 2>[DataReader]")
+        self.assertEqual(log.data, """start: /usr/bin/true | /usr/bin/true 2>[DataReader]\n"""
+                         """success: /usr/bin/true | /usr/bin/true 2>[DataReader]\n""")
 
     def testPipeFailStderr(self):
         nopen = self.numOpenFiles()
@@ -470,6 +482,12 @@ class FunctionTests(PipettorTestBase):
         outf = self.getOutputFile(".out")
         run([("cat",), ("cat",)], stdin=inf, stdout=File(outf, "w"))
         self.diffExpected(".out")
+        self.orphanChecks(nopen)
+
+    def testPathObj(self):
+        nopen = self.numOpenFiles()
+        true_path = Path("/usr/bin/true")
+        run([true_path])
         self.orphanChecks(nopen)
 
     def testSimplePipeFail(self):

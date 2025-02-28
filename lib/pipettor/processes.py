@@ -8,6 +8,7 @@ import shlex
 import logging
 import subprocess
 import enum
+from pathlib import Path
 from io import UnsupportedOperation
 from threading import RLock
 from pipettor.devices import Dev
@@ -269,7 +270,7 @@ class Pipeline(object):
         self.logger = _getLoggerToUse(logger)
         self.logLevel = _getLogLevelToUse(logLevel)
 
-        if isinstance(cmds[0], str):
+        if isinstance(cmds[0], (str, Path)):
             cmds = [cmds]  # one-process pipeline
         cmds = self._stringify(cmds)
         try:
