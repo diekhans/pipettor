@@ -14,6 +14,22 @@ with open('HISTORY.rst') as history_file:
 requirements = [
 ]
 
+extras_require={
+    "dev": [
+        "bumpversion>=0.5.3",
+        "wheel>=0.23.0",
+        "flake8>=2.4.1",
+        "tox>=2.1.1",
+        "coverage>=4.0",
+        "Sphinx>=1.3.1",
+        "cryptography>=1.0.1",
+        "PyYAML>=3.11",
+        "twine>=1.11",
+        "pytest>=5.3",
+        "vulture>=2.1",
+    ],
+}
+
 setuptools.setup(
     name = 'pipettor',
     version = '1.0.0',
@@ -38,11 +54,10 @@ setuptools.setup(
         'License :: OSI Approved :: MIT License',
         'Natural Language :: English',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
+        'Programming Language :: Python :: 3.12',
         'Operating System :: POSIX',
         'Operating System :: MacOS :: MacOS X',
         'Topic :: Software Development :: Libraries :: Python Modules'

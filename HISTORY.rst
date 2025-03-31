@@ -3,10 +3,16 @@
 History
 =======
 
+1.1.0 (2025-03-31)
+------------------
+* Documentation fixes.
+* Allow Program to be a path object.
+* Add to Conda Forge to allow BioConda packages to depend on pipettor
+
 1.0.0 (2023-06-29)
 ------------------
 * Don't use a process group; as it caused signals to not get propagated.  Processes are explicitly waited for by pid, so this will not consume the exit of other process not create by this module.
-  
+ 
 
 0.8.0 (2023-02-05)
 ------------------
