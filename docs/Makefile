@@ -49,7 +49,7 @@ help:
 	@echo "  doctest    to run all doctests embedded in the documentation (if enabled)"
 
 clean:
-	rm -rf $(BUILDDIR) html ${APIDOC_RST}
+	rm -rf $(BUILDDIR) html generated ${APIDOC_RST}
 
 
 html: ${APIDOC_RST}

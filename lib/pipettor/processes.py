@@ -234,28 +234,26 @@ class Process(object):
 
 class Pipeline(object):
     """
-    A process pipeline.  Once constructed, the pipeline
-    is started with start(), poll(), or wait() functions.
+    A process pipeline. Once constructed, the pipeline is started with
+    the :meth:`start`, :meth:`poll`, or :meth:`wait` functions.
 
-    The cmds argument is either a list of arguments for a single process, or a
-    list of such lists for a pipeline. If the stdin/out/err arguments are
-    none, the open files are are inherited.  Otherwise they can be string file
-    names, file-like objects, file number, or Dev object.  Stdin is input to
-    the first process, stdout is output to the last process and stderr is
-    attached to all processed. DataReader and DataWriter objects can be
-    specified for stdin/out/err asynchronously I/O with the pipeline without
-    the danger of deadlock.
+    :param cmds: A list (or tuple) of arguments for a single process, or a
+         list of such lists for a pipeline. Arguments are converted to strings.
+    :param stdin: Input to the first process. Can be None (inherit), a
+         filename, file-like object, file descriptor, a :class:`pipettor.File`
+         object, or a :class:`pipettor.DataWriter`.
+    :param stdout: Output from the last process. Same options as `stdin`, or a :class:`pipettor.DataReader`.
+    :param stderr: stderr for all processes. Same options as `stdout`, or the
+        :class:`pipettor.DataReader` class itself. In that case, an instance is
+        created with encoding errors handled using ``backslashreplace``.
+    :param logger: Name of the logger or a `Logger` instance to use instead of the default.
+    :param logLevel: Log level to use instead of the default.
 
-    If stderr is the class DataReader, a new instance is created for each
-    process in the pipeline. The contents of stderr will include an
-    exception if an occurs in that process.  If an instance of DataReader
-    is provided, the contents of stderr from all process will be included in
-    the exception.
+    :raises pipettor.ProcessException: If the pipeline fails.
 
-    Command arguments will be converted to strings.
-
-    The logger argument can be the name of a logger or a logger object.  If
-    none, default is user.
+    If a :class:`pipettor.DataReader` is provided for `stderr` and the
+    pipeline fails, the contents of stderr from all processes will be included
+    in the :class:`pipettor.ProcessException` object.
     """
     def __init__(self, cmds, *, stdin=None, stdout=None, stderr=DataReader,
                  logger=None, logLevel=None):
@@ -509,36 +507,46 @@ class Pipeline(object):
 
 
 class Popen(Pipeline):
-    """File-like object of processes to read from or write to a Pipeline.
+    """
+    File-like object of processes to read from or write to a Pipeline.
 
-    The cmds argument is either a list of arguments for a single process,
-    or a list of such lists for a pipeline.  Mode is 'r' for a pipeline
-    who's output will be read, or 'w' for a pipeline to that is to have
-    data written to it.  If stdin or stdout is specified, and is a string,
-    it is a file to open as other file at the other end of the pipeline.
-    If it's not a string, it is assumed to be a file object to use for
-    input or output.  For a read pipe, only stdin can be specified, for a
-    write pipe, only stdout can be used.
+    :param cmds: A list (or tuple) of arguments for a single process, or a
+         list of such lists for a pipeline. Arguments are converted to strings.
+    :param mode: `'r'` or `'rb'` for reading from the pipeline, `'w'` or `'wb'` for writing to it. Using `'b'` results in `bytes` input/output instead of `str`.
+    :param stdin: Input to the first process. Can be None (inherit), a
+        filename, file-like object, file descriptor, a :class:`pipettor.File`
+        object, or a :class:`pipettor.DataWriter`.
+    :param stdout: Output from the last process. Same options as `stdin`, or a :class:`pipettor.DataReader`.
+    :param stderr: stderr for all processes. Same options as `stdout`, or the
+        :class:`pipettor.DataReader` class itself. In that case, an instance is
+        created with encoding errors handled using ``backslashreplace``.
+    :param logger: Name of the logger or a `Logger` instance to use instead of the default.
+    :param logLevel: Log level to use instead of the default.
+    :param buffering: Buffering policy. If 0, unbuffered; 1 for line buffering; any other positive integer sets buffer size. Default is -1 (system default).
+    :type buffering: int, optional
+    :param encoding: Name of the encoding used to decode or encode the file. Only used in text mode. Defaults to None (system default).
+    :type encoding: str, optional
+    :param errors: Specifies how encoding/decoding errors are handled. Defaults to None (system default).
+    :type errors: str, optional
 
-    read pipeline ('r'):
-      stdin --> cmd[0] --> ... --> cmd[n] --> Popen
+    :raises pipettor.ProcessException: If the pipeline fails.
 
-    write pipeline ('w')
-      Popen --> cmd[0] --> ... --> cmd[n] --> stdout
+    If a :class:`pipettor.DataReader` is provided for `stderr` and the
+    pipeline fails, the contents of stderr from all processes will be included
+    in the :class:`pipettor.ProcessException` object.
 
-    Command arguments will be converted to strings.
+    **Pipeline Modes**
 
-    The logger argument can be the name of a logger or a logger object.  If
-    none, default is user.
+    - Read pipeline (`'r'`):
+      stdin → cmd[0] → ... → cmd[n] → Popen
 
-    Specifying binary access results in data of type bytes, otherwise str type
-    is returned.  The buffering, encoding, and errors arguments are as used in
-    the open() function.
+    - Write pipeline (`'w'`):
+      Popen → cmd[0] → ... → cmd[n] → stdout
     """
 
-    # note: this follows I/O _pyio.py structure, but doesn't extend class
-    # due to it doing both binary and text I/O.  Probably could do this
-    # with some kind of dynamic base class setting.
+    # note: this follows I/O _pyio.py structure, but doesn't extend those class
+    # due to it doing both binary and text I/O.  Probably could do this with
+    # some kind of dynamic base class setting.
 
     def __init__(self, cmds, mode='r', *, stdin=None, stdout=None, logger=None, logLevel=None,
                  buffering=-1, encoding=None, errors=None):

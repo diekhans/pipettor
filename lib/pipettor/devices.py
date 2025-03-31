@@ -184,7 +184,7 @@ class DataWriter(Dev):
 
 class File(Dev):
     """A file path for input or output, used for specifying stdio associated
-    with files. Mode is invalued on of standard r, w, or a"""
+    with files. Mode is one of `r`, `w`, or `a`"""
 
     def __init__(self, path, mode="r"):
         super(File, self).__init__()

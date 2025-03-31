@@ -10,45 +10,54 @@ __version__ = "1.0.0"
 
 
 def run(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLevel=None):
-    """Construct and run an process pipeline. If any of the processes fail,
-    a ProcessException is throw.
+    """
+    Construct and run a process pipeline. If any of the processes fail,
+    a :class:`pipettor.ProcessException` is raised.
 
-    `cmds` is either a list of arguments for a single process, or a list of
-    such lists for a pipeline. If the `stdin`, `stdout`, or `stderr` arguments
-    are none, the open files are are inherited.  Otherwise they can be string
-    file names, file-like objects, file number, or :class:`pipettor.Dev`
-    object.  `stdin` is input to the first process, `stdout` is output to the
-    last process and `stderr` is attached to all processed.
-    :class:`pipettor.DataReader` and :class:`pipettor.DataWriter` objects can
-    be specified for `stdin`, `stdout`, or `stderr` asynchronously I/O with
-    the pipeline without the danger of deadlock.
+    :param cmds: A list (or tuple) of arguments for a single process, or a
+        list of such lists for a pipeline. Arguments are converted to strings.
+    :param stdin: Input to the first process. Can be None (inherit), a
+        filename, file-like object, file descriptor, a :class:`pipettor.File`
+        object, or a :class:`pipettor.DataWriter`.
+    :param stdout: Output from the last process. Same options as `stdin`, or a :class:`pipettor.DataReader`.
+    :param stderr: stderr for all processes. Same options as `stdout`, or the
+       :class:`pipettor.DataReader` class itself. In the latter case, a new
+       instance is created with encoding errors handled using ``backslashreplace``.
+    :param logger: Name of the logger or a `Logger` instance to use instead of the default.
+    :param logLevel: Log level to use instead of the default.
 
-    If stderr is the class DataReader, a new instance is created for each
-    process in the pipeline. The contents of stderr will include an exception
-    if an occurs in that process.  If an instance of
-    :class:`pipettor.DataReader` is provided, the contents of stderr from all
-    process will be included in the exception.
+    :raises pipettor.ProcessException: If the pipeline fails.
+
+    If a :class:`pipettor.DataReader` is provided for `stderr` and the
+    pipeline fails, the contents of stderr from all processes will be included
+    in the :class:`pipettor.ProcessException` object.
     """
     Pipeline(cmds, stdin=stdin, stdout=stdout, stderr=stderr, logger=logger, logLevel=logLevel).wait()
 
 
 def runout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None,
-           buffering=-1, encoding=None, errors=None):
-    """Construct and run an process pipeline, returning the output. If any of the
-    processes fail, a ProcessException is throw.
-
-    See the :func:`pipettor.run` function for more details.  Use
-    `str.splitlines()` to split result into lines.
-
-    The logger argument can be the name of a logger or a logger object.  If
-    none, default is user.
-
-    Specifying binary access results in data of type bytes, otherwise str type
-    is return.  The buffering, encoding, and errors arguments are as used in
-    the open() function.
+           buffering=-1, encoding=None, errors=None, binary=False):
     """
-    dr = DataReader(buffering=buffering, encoding=encoding, errors=errors)
-    Pipeline(cmds, stdin=stdin, stdout=dr, stderr=stderr, logger=logger, logLevel=logLevel).wait()
+    Construct and run a process pipeline, returning the output.
+    If any of the processes fail, a :class:`pipettor.ProcessException` is raised.
+
+    See the :func:`pipettor.run` function for more details. Use
+    ``str.splitlines()`` to split the result into lines.
+
+    :param buffering: Optional integer. If set to 0, unbuffered. 1 for line buffering. Any other positive integer for buffer size. Default is -1 (system default).
+    :type buffering: int, optional
+    :param encoding: Name of the encoding used to decode or encode the file. Only used in text mode. Defaults to None (system default).
+    :type encoding: str, optional
+    :param errors: Specifies how encoding/decoding errors are handled. Default is None (uses system default).
+    :type errors: str, optional
+    :param binary: If True, data is returned as `bytes`, otherwise as `str` using the specified encoding.
+    :type binary: bool, optional
+
+    :raises pipettor.ProcessException: If the pipeline fails.
+    """
+    dr = DataReader(binary=binary, buffering=buffering, encoding=encoding, errors=errors)
+    Pipeline(cmds, stdin=stdin, stdout=dr, stderr=stderr,
+             logger=logger, logLevel=logLevel).wait()
     return dr.data
 
 
@@ -64,10 +73,7 @@ def runlex(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLev
     """Call :func:`pipettor.run`, first splitting commands specified as strings
     are split into arguments using `shlex.split`.
 
-    If `cmds` is a string, it is split into arguments and run as as a single
-    process.  If `cmds` is a list, a multi-process pipeline is created.
-    Elements that are strings are split into arguments to form commands.
-    Elements that are lists are treated as commands without splitting.
+    See :func:`run` for details.
     """
     run(_lexcmds(cmds), stdin=stdin, stdout=stdout, stderr=stderr, logger=logger, logLevel=None)
 
@@ -77,17 +83,7 @@ def runlexout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None,
     """Call :func:`pipettor.runout`, first splitting commands specified
     as strings are split into arguments using `shlex.split`.
 
-    If `cmds` is a string, it is split into arguments and run as as a single
-    process.  If `cmds` is a list, a multi-process pipeline is created.
-    Elements that are strings are split into arguments to form commands.
-    Elements that are lists are treated as commands without splitting.
-
-    The logger argument can be the name of a logger or a logger object.  If
-    none, default is user.
-
-    Specifying binary access results in data of type bytes, otherwise str type
-    is returned.  The buffering, encoding, and errors arguments are as used in
-    the open() function.
+    See :func:`runout` for details.
     """
     return runout(_lexcmds(cmds), stdin=stdin, stderr=stderr, logger=logger, logLevel=logLevel,
                   buffering=buffering, encoding=encoding, errors=errors)
