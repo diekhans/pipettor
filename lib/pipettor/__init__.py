@@ -6,7 +6,7 @@ from pipettor.exceptions import PipettorException, ProcessException
 from pipettor.devices import DataReader, DataWriter, File
 from pipettor.processes import Pipeline, Popen, setDefaultLogger, getDefaultLogger, setDefaultLogLevel, getDefaultLogLevel, setDefaultLogging
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 
 def run(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLevel=None):

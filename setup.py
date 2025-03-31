@@ -32,7 +32,7 @@ extras_require={
 
 setuptools.setup(
     name = 'pipettor',
-    version = '1.0.0',
+    version = '1.1.0',
     description = "pipettor - robust, easy to use Unix process pipelines",
     long_description = readme + '\n\n' + history,
     long_description_content_type="text/markdown",
