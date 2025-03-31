@@ -108,8 +108,7 @@ install: clean
 	${PIP} install .
 
 dist: clean
-	${PYTHON} -m build sdist
-	${PYTHON} -m build  bdist_wheel
+	${PYTHON} -m build
 	@ls -l dist
 
 # test install locally
