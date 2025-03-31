@@ -1,3 +1,5 @@
+* install with development dependencies
+```pip install -e .[dev]```
 * development testing
 ** check code with fake8:
 make lint
