@@ -1,6 +1,8 @@
 # -*- mode: makefile-gmake  -*-
 
 PYTHON ?= python3
+PIP ?= pip3
+SET_TREE_PYTHONPATH = PYTHONPATH=lib:${PYTHONPATH}
 
 coverage = ${PYTHON} -m coverage
 twine = ${PYTHON} -m twine
@@ -81,13 +83,13 @@ vulture:
 
 pytestOpts = --tb=native -rsx
 test:
-	PYTHONPATH=lib:${PYTHONPATH} ${PYTHON} -W always -m pytest ${pytestOpts} tests
+	${SET_TREE_PYTHONPATH} ${PYTHON} -W always -m pytest ${pytestOpts} tests
 
 test-all:
 	tox
 
 coverage:
-	${coverage} run --source pipettor setup.py test
+	${SET_TREE_PYTHONPATH} ${coverage} run -m pytest ${pytestOpts} tests
 	${coverage} report -m
 	${coverage} html
 	${browser} htmlcov/index.html
@@ -103,12 +105,12 @@ docs-open: docs
 	${browser} docs/_build/html/index.html
 
 install: clean
-	${PYTHON} setup.py install
+	${PIP} install .
 
 dist: clean
-	${PYTHON} setup.py sdist
-	${PYTHON} setup.py bdist_wheel
-	ls -l dist
+	${PYTHON} -m build sdist
+	${PYTHON} -m build  bdist_wheel
+	@ls -l dist
 
 # test install locally
 test-pip: dist
