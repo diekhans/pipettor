@@ -57,20 +57,14 @@ help:
 clean: clean-build clean-pyc clean-test clean-docs
 
 clean-build:
-	rm -fr build/
-	rm -fr dist/
-	rm -fr .eggs/
-	rm -fr ${testenv}/
-	rm -fr pipettor.egg-info/
+	rm -fr build/ dist/ .eggs/ ${testenv}/ pipettor.egg-info/
 
 clean-pyc:
-	rm -fr lib/pipettor/__pycache__
-	rm -fr tests/__pycache__
+	rm -fr lib/pipettor/__pycache__ tests/__pycache__
 
 
 clean-docs:
-	rm -f docs/pipettor.rst
-	rm -f docs/modules.rst
+	rm -f docs/pipettor.rst docs/modules.rst
 	$(MAKE) -C docs clean
 
 clean-test:
