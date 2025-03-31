@@ -28,3 +28,8 @@ formats:
 python:
    install:
       - requirements: requirements_dev.txt
+  install:
+      - method: pip
+        path: .
+        extra_requirements:
+          - dev

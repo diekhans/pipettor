@@ -14,7 +14,9 @@ make coverage
 ** build docs:
   make docs
 or on Mac OS/X
-  make docs-open  
+  make docs-open
+** push to github
+** rebuild master at readthedocs to check for errors
 
 * test pip with testpypi
 ** Update the version in code, but don't change git.  Version number needed for testing pip, however this might result in changes
@@ -40,3 +42,12 @@ make test-release-testpypi
 ** update readthedocs version in GUI
 ** make release-test
 might have to wait a minute for it to become live
+** make a new release on github
+** update readthedocs to build this release
+
+* CondaForge
+
+** staging
+conda create --name pipettor-conda
+conda install -c conda-forge grayskull
+grayskull pypi --strict-conda-forge pipettor
