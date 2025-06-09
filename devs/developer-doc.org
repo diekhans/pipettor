@@ -50,4 +50,5 @@ might have to wait a minute for it to become live
 ** staging
 conda create --name pipettor-conda
 conda install -c conda-forge grayskull
+git checkout -b pipettor
 grayskull pypi --strict-conda-forge pipettor
