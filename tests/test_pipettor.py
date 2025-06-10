@@ -343,6 +343,12 @@ class PipelineTests(PipettorTestBase):
         self.assertEqual(dr.data, "one\ntwo\n")
         self.commonChecks(nopen, pl, "^head -2 <.+/input/simple1\\.txt >\\[DataReader\\]", isRe=True)
 
+    def testStderrPipeRedir(self):
+        # generated PipettorException: DataReader already bound to a process
+        stderr = DataReader(errors='backslashreplace')
+        cmds = (["date"], ["rev"])
+        p = Pipeline(cmds, stdout='/dev/null', stderr=stderr)
+        p.wait()
 
 class PopenTests(PipettorTestBase):
     def __init__(self, methodName):

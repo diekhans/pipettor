@@ -20,7 +20,7 @@ from pipettor.exceptions import PipettorException
 #  http://code.activestate.com/recipes/496735-workaround-for-missed-sigint-in-multithreaded-prog/
 
 
-class Dev(object):
+class Dev:
     """Base class for objects specifying process input or output.  They
     provide a way of hide details of setting up interprocess
     communication.
@@ -29,7 +29,8 @@ class Dev(object):
        read_fd - file integer descriptor for reading
        read_fh - file object for reading
        write_fd - file integer descriptor for writing
-       write_fh - file object for writing"""
+       write_fh - file object for writing
+    """
 
     def _bind_read_to_process(self, process):
         """associate read side with child process."""
@@ -54,37 +55,26 @@ class Dev(object):
         """close the device"""
         pass
 
-
-class DataReader(Dev):
-    """Object to asynchronously read data from process into memory via a pipe.  A
-    thread is use to prevent deadlock when both reading and writing to a child
-    pipeline.
-
-    Specifying binary access results in data of type bytes, otherwise str type
-    is returned.  The buffering, encoding, and errors arguments are as used in
-    the open() function.
-    """
-    def __init__(self, *, binary=False, buffering=-1, encoding=None, errors=None):
-        super(DataReader, self).__init__()
-        self.binary = binary
+class _ReaderThread:
+    """thread and pipe associated with DataReader.
+    this is a separate class to allow for multiple
+    process that write to stderr"""
+    def __init__(self, readfn, binary, buffering, encoding, errors):
+        self._readfn = readfn
         self._process = None
-        self._buffer = []
         self._thread = None
         self.read_fh = self.write_fd = None
         read_fd, self.write_fd = os.pipe()
         mode = "rb" if binary else "r"
         self.read_fh = open(read_fd, mode, buffering=buffering, encoding=encoding, errors=errors)
 
-    def __str__(self):
-        return "[DataReader]"
-
-    def _bind_write_to_process(self, process):
+    def bind_write_to_process(self, process):
         """associate write side with child process."""
         if self._process is not None:
             raise PipettorException("DataReader already bound to a process")
         self._process = process
 
-    def _post_start_parent(self):
+    def post_start_parent(self):
         "called to do any post-start handling in the parent"
         os.close(self.write_fd)
         self.write_fd = None
@@ -108,7 +98,58 @@ class DataReader(Dev):
     def _reader(self):
         "child read thread function"
         assert self.write_fd is None
-        self._buffer.append(self.read_fh.read())
+        self._readfn(self.read_fh.read())
+
+class DataReader(Dev):
+    """Object to asynchronously read data from process into memory via a pipe.  A
+    thread is use to prevent deadlock when both reading and writing to a child
+    pipeline.
+
+    Specifying binary access results in data of type bytes, otherwise str type
+    is returned.  The buffering, encoding, and errors arguments are as used in
+    the open() function.
+    """
+    def __init__(self, *, binary=False, buffering=-1, encoding=None, errors=None):
+        super(DataReader, self).__init__()
+        self.binary = binary
+        self._buffer = []
+        self._thread = _ReaderThread(self._readfn, binary, buffering, encoding, errors)
+
+    def __str__(self):
+        return "[DataReader]"
+
+    def _bind_write_to_process(self, process):
+        """associate write side with child process."""
+        self._thread.bind_write_to_process(process)
+
+    def _post_start_parent(self):
+        self._thread.post_start_parent()
+
+    def close(self):
+        "close pipes and terminate thread"
+        self._thread.post_start_parent()
+
+    def _readfn(self, data):
+        "store to buffer n"
+        self._buffer.append(data)
+
+    # FIXME: temporary until finish multiple readers (see #31)
+
+    @property
+    def read_fd(self):
+        return self._thread.read_fd
+
+    @property
+    def read_fh(self):
+        return self._thread.read_fh
+
+    @property
+    def write_fd(self):
+        return self._thread.write_fd
+
+    @property
+    def write_fh(self):
+        return self._thread.write_fh
 
     @property
     def data(self):
@@ -117,7 +158,6 @@ class DataReader(Dev):
             return b"".join(self._buffer)
         else:
             return "".join(self._buffer)
-
 
 class DataWriter(Dev):
     """Object to asynchronously write data to process from memory via a pipe.  A
@@ -152,7 +192,6 @@ class DataWriter(Dev):
         "called to do any start-exec handling in the parent"
         os.close(self.read_fd)
         self.read_fd = None
-
         self._thread = threading.Thread(target=self._writer)
         self._thread.daemon = True  # see note at top of this file
         self._thread.start()
