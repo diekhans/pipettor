@@ -1,18 +1,13 @@
 # -*- mode: makefile-gmake  -*-
-
-PYTHON ?= python3
-PIP ?= pip3
-SET_TREE_PYTHONPATH = PYTHONPATH=lib:${PYTHONPATH}
-
-coverage = ${PYTHON} -m coverage
-twine = ${PYTHON} -m twine
+root = .
+include ${root}/defs.mk
 
 version = $(shell PYTHONPATH=lib ${PYTHON} -c "import pipettor; print(pipettor.__version__)")
 
 ifeq ($(shell uname),Darwin)
-  browser = open
+  BROWSER = open
 else
-  browser = true
+  BROWSER = true
 endif
 
 .PHONY: help clean clean-build clean-pyc clean-docs clean-tests \
@@ -81,17 +76,16 @@ lint:
 vulture:
 	${PYTHON} -m vulture lib/pipettor tests
 
-pytestOpts = --tb=native -rsx
 test:
-	${SET_TREE_PYTHONPATH} ${PYTHON} -W always -m pytest ${pytestOpts} tests
+	${SET_TREE_PYTHONPATH} ${PYTEST} tests
 
 test-all:
 	tox
 
 coverage:
-	${SET_TREE_PYTHONPATH} ${coverage} run -m pytest ${pytestOpts} tests
-	${coverage} report -m
-	${coverage} html
+	${SET_TREE_PYTHONPATH} ${COVERAGE} run -m pytest ${PYTEST_OPTS} tests
+	${COVERAGE} report -m
+	${COVERAGE} html
 	${browser} htmlcov/index.html
 
 docs:
@@ -122,7 +116,7 @@ dist_tar = dist/pipettor-${version}.tar.gz
 
 # test release to testpypi
 release-testpypi: dist
-	${twine} upload --repository=testpypi ${dist_wheel} ${dist_tar}
+	${TWINE} upload --repository=testpypi ${dist_wheel} ${dist_tar}
 
 # test release install from testpypi
 test-release-testpypi:
@@ -131,7 +125,7 @@ test-release-testpypi:
 	${envact} && ${PYTHON} ../tests/test_pipettor.py
 
 release: dist
-	${twine} upload --repository=pypi ${dist_wheel} ${dist_tar}
+	${TWINE} upload --repository=pypi ${dist_wheel} ${dist_tar}
 
 release-test:
 	${envsetup}

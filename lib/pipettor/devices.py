@@ -12,11 +12,15 @@ class Dev:
     """Base class for objects specifying process input or output.  They
     provide a way of hide details of setting up interprocess
     communication.
-
-    Derived class implement the following funcions
-       get_child_read_fd() - file integer descriptor for child reading from device
-       get_child_write_fd() - file integer descriptor for child writing to device
     """
+
+    def get_child_write_fd(self, process):
+        """get write-to fileno for specified process associated with this device"""
+        raise NotImplementedError('get_child_write_fd')
+
+    def get_child_read_fd(self, process):
+        """get read-fromo fileno for specified process associated with this device"""
+        raise NotImplementedError('get_child_read_fd')
 
     def _bind_read_to_process(self, process):
         """associate read side with child process."""
@@ -45,20 +49,14 @@ class _ReaderThread:
     """thread and pipe associated with DataReader.
     this is a separate class to allow for multiple
     process that write to stderr"""
-    def __init__(self, readfn, binary, buffering, encoding, errors):
+    def __init__(self, process, readfn, binary, buffering, encoding, errors):
+        self.process = process
         self._readfn = readfn
-        self._process = None
         self._thread = None
         self.read_fh = self.write_fd = None
         read_fd, self.write_fd = os.pipe()
         mode = "rb" if binary else "r"
         self.read_fh = open(read_fd, mode, buffering=buffering, encoding=encoding, errors=errors)
-
-    def bind_write_to_process(self, process):
-        """associate write side with child process."""
-        if self._process is not None:
-            raise PipettorException("DataReader already bound to a process")
-        self._process = process
 
     def post_start_parent(self):
         "called to do any post-start handling in the parent"
@@ -99,31 +97,45 @@ class DataReader(Dev):
     def __init__(self, *, binary=False, buffering=-1, encoding=None, errors=None):
         super().__init__()
         self.binary = binary
+        self._threads = []
         self._buffer = []
         self._lock = threading.Lock()
-        self._thread = _ReaderThread(self._readfn, binary, buffering, encoding, errors)
+        self.binary = binary
+        self.buffering = buffering
+        self.encoding = encoding
+        self.errors = errors
 
     def __str__(self):
         return "[DataReader]"
 
+    def _bind_read_to_process(self, process):
+        """associate read side with child process."""
+        raise NotImplementedError('DataReader._bind_read_to_process')
+
     def _bind_write_to_process(self, process):
         """associate write side with child process."""
-        self._thread.bind_write_to_process(process)
+        thread = _ReaderThread(process, self._readfn, self.binary, self.buffering, self.encoding, self.errors)
+        self._threads.append(thread)
 
     def _post_start_parent(self):
-        self._thread.post_start_parent()
+        for thread in self._threads:
+            thread.post_start_parent()
 
     def close(self):
         "close pipes and terminate thread"
-        self._thread.close()
+        for thread in self._threads:
+            thread.close()
 
     def _readfn(self, data):
         "store to buffer"
         with self._lock:
             self._buffer.append(data)
 
-    def get_child_write_fd(self):
-        return self._thread.write_fd
+    def get_child_write_fd(self, process):
+        for thread in self._threads:
+            if process is thread.process:
+                return thread.write_fd
+        raise ValueError("process not associated with this device")
 
     @property
     def data(self):
@@ -162,6 +174,10 @@ class DataWriter(Dev):
             raise PipettorException("DataWriter already bound to a process")
         self._process = process
 
+    def _bind_write_to_process(self, process):
+        """associate write side with child process."""
+        raise NotImplementedError('_bind_write_to_process')
+
     def _post_start_parent(self):
         "called to do any start-exec handling in the parent"
         os.close(self._read_fd)
@@ -169,7 +185,8 @@ class DataWriter(Dev):
         self._thread = threading.Thread(target=self._writer, daemon=True)
         self._thread.start()
 
-    def get_child_read_fd(self):
+    def get_child_read_fd(self, process):
+        assert process is self._process
         return self._read_fd
 
     def close(self):
@@ -219,6 +236,18 @@ class File(Dev):
     def __str__(self):
         return self.path
 
+    def get_child_write_fd(self, process):
+        assert self._write_fd is not None
+        return self._write_fd
+
+    def get_child_read_fd(self, process):
+        assert self._read_fd is not None
+        return self._read_fd
+
+    def _post_start_parent(self):
+        """post-fork child setup."""
+        self.close()
+
     def close(self):
         "close file if open"
         if self._read_fd is not None:
@@ -227,18 +256,6 @@ class File(Dev):
         if self._write_fd is not None:
             os.close(self._write_fd)
             self._write_fd = None
-
-    def _post_start_parent(self):
-        """post-fork child setup."""
-        self.close()
-
-    def get_child_write_fd(self):
-        assert self._write_fd is not None
-        return self._write_fd
-
-    def get_child_read_fd(self):
-        assert self._read_fd is not None
-        return self._read_fd
 
 
 class _SiblingPipe(Dev):
@@ -252,18 +269,18 @@ class _SiblingPipe(Dev):
     def __str__(self):
         return "[Pipe]"
 
+    def get_child_write_fd(self, process):
+        return self._write_fd
+
+    def get_child_read_fd(self, process):
+        return self._read_fd
+
     def _post_start_parent(self):
         "called to do any post-exec handling in the parent"
         os.close(self._read_fd)
         self._read_fd = None
         os.close(self._write_fd)
         self._write_fd = None
-
-    def get_child_write_fd(self):
-        return self._write_fd
-
-    def get_child_read_fd(self):
-        return self._read_fd
 
     def close(self):
         if self._read_fd is not None:

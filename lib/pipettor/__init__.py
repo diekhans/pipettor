@@ -17,20 +17,26 @@ def run(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLevel=
     :param cmds: A list (or tuple) of arguments for a single process, or a
         list of such lists for a pipeline. Arguments are converted to strings.
     :param stdin: Input to the first process. Can be None (inherit), a
-        filename, file-like object, file descriptor, a :class:`pipettor.File`
-        object, or a :class:`pipettor.DataWriter`.
-    :param stdout: Output from the last process. Same options as `stdin`, or a :class:`pipettor.DataReader`.
-    :param stderr: stderr for all processes. Same options as `stdout`, or the
-       :class:`pipettor.DataReader` class itself. In the latter case, a new
-       instance is created with encoding errors handled using ``backslashreplace``.
+         filename, file-like object, file descriptor, a :class:`pipettor.File`
+         object, or a :class:`pipettor.DataWriter` object.
+    :param stdout: Output from the last process. Can be None (inherit), a
+         filename, file-like object, file descriptor, a :class:`pipettor.File`
+         object, or a :class:`pipettor.DataReader` object.
+    :param stderr: stderr for the pipeline.  Can be None (inherit), a
+         filename, file-like object, file descriptor, a :class:`pipettor.File`
+         object, or a :class:`pipettor.DataReader` object.  It may also be the
+         class :class:`pipettor.DataReader` itself, in which case a DataReader
+         will be create for each process encoding errors handled using
+        ``backslashreplace``.
     :param logger: Name of the logger or a `Logger` instance to use instead of the default.
     :param logLevel: Log level to use instead of the default.
 
     :raises pipettor.ProcessException: If the pipeline fails.
 
     If a :class:`pipettor.DataReader` is provided for `stderr` and the
-    pipeline fails, the contents of stderr from all processes will be included
-    in the :class:`pipettor.ProcessException` object.
+    pipeline fails, the contents of stderr from the first processes that fails will be included
+    in the :class:`pipettor.ProcessException` object.  If an instance of :class:`pipettor.DataReader`
+    is provide, stderr of all processes in combined.
     """
     Pipeline(cmds, stdin=stdin, stdout=stdout, stderr=stderr, logger=logger, logLevel=logLevel).wait()
 
@@ -43,15 +49,6 @@ def runout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None,
 
     See the :func:`pipettor.run` function for more details. Use
     ``str.splitlines()`` to split the result into lines.
-
-    :param buffering: Optional integer. If set to 0, unbuffered. 1 for line buffering. Any other positive integer for buffer size. Default is -1 (system default).
-    :type buffering: int, optional
-    :param encoding: Name of the encoding used to decode or encode the file. Only used in text mode. Defaults to None (system default).
-    :type encoding: str, optional
-    :param errors: Specifies how encoding/decoding errors are handled. Default is None (uses system default).
-    :type errors: str, optional
-    :param binary: If True, data is returned as `bytes`, otherwise as `str` using the specified encoding.
-    :type binary: bool, optional
 
     :raises pipettor.ProcessException: If the pipeline fails.
     """

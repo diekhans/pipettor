@@ -32,6 +32,9 @@ signal.signal(signal.SIGABRT,
 def setup_module(module):
     tracemalloc.start()
 
+def _getProgWithErrorCmd(test, *args):
+    return (os.path.join(test.getTestDir(), "progWithError"),) + args
+
 class PipettorTestBase(TestCaseBase):
     "provide common functions used in test classes"
     def __init__(self, methodName):
@@ -56,7 +59,7 @@ class PipettorTestBase(TestCaseBase):
                 self.assertEqual(s, expectStr)
         self.orphanChecks(nopen)
 
-    def checkProgWithError(self, procExcept, progArgs=None):
+    def _checkProgWithError(self, procExcept, progArgs=None):
         expectReTmpl = "^process exited 1: .+/progWithError{}{}:\nTHIS GOES TO STDERR{}{}.*$"
         if progArgs is not None:
             expectRe = expectReTmpl.format(" ", progArgs, ": ", progArgs)
@@ -136,27 +139,27 @@ class PipelineTests(PipettorTestBase):
     def testPipeFailStderr(self):
         nopen = self.numOpenFiles()
         # should report first failure
-        pl = Pipeline([("true",), (os.path.join(self.getTestDir(), "progWithError"),), ("false",)], stderr=DataReader)
+        pl = Pipeline([("true",), _getProgWithErrorCmd(self), ("false",)], stderr=DataReader)
         with self.assertRaises(ProcessException) as cm:
             pl.wait()
-        self.checkProgWithError(cm.exception)
+        self._checkProgWithError(cm.exception)
         self.orphanChecks(nopen)
 
     def testPipeFail3Stderr(self):
         # all 3 process fail
         nopen = self.numOpenFiles()
         # should report first failure
-        pl = Pipeline([(os.path.join(self.getTestDir(), "progWithError"), "process0"),
-                       (os.path.join(self.getTestDir(), "progWithError"), "process1"),
-                       (os.path.join(self.getTestDir(), "progWithError"), "process2")],
+        pl = Pipeline([_getProgWithErrorCmd(self, "process0"),
+                       _getProgWithErrorCmd(self, "process1"),
+                       _getProgWithErrorCmd(self, "process2")],
                       stderr=DataReader)
         with self.assertRaises(ProcessException) as cm:
             pl.wait()
         # should be first process
-        self.checkProgWithError(cm.exception, "process0")
+        self._checkProgWithError(cm.exception, "process0")
         # check process
         for i in range(3):
-            self.checkProgWithError(pl.procs[i].procExcept, "process{}".format(i))
+            self._checkProgWithError(pl.procs[i].procExcept, "process{}".format(i))
         self.orphanChecks(nopen)
 
     def testExecFail(self):
@@ -318,13 +321,12 @@ class PipelineTests(PipettorTestBase):
             pl.wait()
         self.orphanChecks(nopen)
 
-    def testDataReaderBogusShare(self):
-        # test stderr specification is not legal
+    def testDataReaderShare(self):
+        # test stderr linked to stdout/stderr
         nopen = self.numOpenFiles()
         dr = DataReader()
-        with self.assertRaisesRegex(PipettorException, "^DataReader already bound to a process$"):
-            pl = Pipeline([("date",), ("date",)], stdout=dr, stderr=dr)
-            pl.wait()
+        pl = Pipeline([("date",), ("date",)], stdout=dr, stderr=dr)
+        pl.wait()
         self.orphanChecks(nopen)
 
     def testDataWriterBogusShare(self):
@@ -346,12 +348,17 @@ class PipelineTests(PipettorTestBase):
         self.assertEqual(dr.data, "one\ntwo\n")
         self.commonChecks(nopen, pl, "^head -2 <.+/input/simple1\\.txt >\\[DataReader\\]", isRe=True)
 
-    def xx_testStderrPipeRedir(self):
-        # generated PipettorException: DataReader already bound to a process
+    def testStderrPipeRedir(self):
+        # stderr DataReader on multiple processes
         stderr = DataReader(errors='backslashreplace')
-        cmds = (["date"], ["rev"])
-        p = Pipeline(cmds, stdout='/dev/null', stderr=stderr)
-        p.wait()
+        cmds = (["sh", "-c", "echo command one >&2"],
+                ["sh", "-c", "echo COMMAND TWO >&2"])
+        pl = Pipeline(cmds, stdout='/dev/null', stderr=stderr)
+        pl.wait()
+        # can't predict order
+        err_sorted = list(sorted(stderr.data.strip().split('\n')))
+        self.assertEqual(err_sorted, ['COMMAND TWO', 'command one'])
+
 
 class PopenTests(PipettorTestBase):
     def __init__(self, methodName):
@@ -518,8 +525,8 @@ class FunctionTests(PipettorTestBase):
         nopen = self.numOpenFiles()
         inf = self.getInputFile("simple1.txt")
         with self.assertRaises(ProcessException) as cm:
-            runout([("sort", "-r"), (os.path.join(self.getTestDir(), "progWithError"),), ("false",)], stdin=inf)
-        self.checkProgWithError(cm.exception)
+            runout([("sort", "-r"), _getProgWithErrorCmd(self), ("false",)], stdin=inf)
+        self._checkProgWithError(cm.exception)
         self.orphanChecks(nopen)
 
     def testWriteFileLex(self):

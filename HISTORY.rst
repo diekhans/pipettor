@@ -3,6 +3,12 @@
 History
 =======
 
+1.2.0
+------------------
+* Support DataReader reading from multiple processes.  This allows collecting stderr
+  from all processes in a pipeline.
+* Can now override stderr in Popen.
+
 1.1.0 (2025-03-31)
 ------------------
 * Documentation fixes.

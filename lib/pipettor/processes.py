@@ -103,7 +103,6 @@ class Process(object):
         self.popen = None
         self.pid = None
         self.returncode = None  # exit code, or -signal
-        # FIXME: should this just be exception for the users??
         self.procExcept = None  # exception because of failed process
         self.state = State.PREINIT
         self.forced = False    # force termination during error cleanup
@@ -134,7 +133,7 @@ class Process(object):
         elif isinstance(spec, int):
             return spec
         elif isinstance(spec, Dev):
-            return spec.get_child_read_fd() if stdfd == 0 else spec.get_child_write_fd()
+            return spec.get_child_read_fd(self) if stdfd == 0 else spec.get_child_write_fd(self)
         else:
             # this should have been detected earlier
             raise PipettorException("_get_child_stdio logic error: {} {}".format(type(spec), stdfd))
@@ -241,19 +240,25 @@ class Pipeline(object):
          list of such lists for a pipeline. Arguments are converted to strings.
     :param stdin: Input to the first process. Can be None (inherit), a
          filename, file-like object, file descriptor, a :class:`pipettor.File`
-         object, or a :class:`pipettor.DataWriter`.
-    :param stdout: Output from the last process. Same options as `stdin`, or a :class:`pipettor.DataReader`.
-    :param stderr: stderr for all processes. Same options as `stdout`, or the
-        :class:`pipettor.DataReader` class itself. In that case, an instance is
-        created with encoding errors handled using ``backslashreplace``.
+         object, or a :class:`pipettor.DataWriter` object.
+    :param stdout: Output from the last process. Can be None (inherit), a
+         filename, file-like object, file descriptor, a :class:`pipettor.File`
+         object, or a :class:`pipettor.DataReader` object.
+    :param stderr: stderr for the pipeline.  Can be None (inherit), a
+         filename, file-like object, file descriptor, a :class:`pipettor.File`
+         object, or a :class:`pipettor.DataReader` object.  It may also be the
+         class :class:`pipettor.DataReader` itself, in which case a DataReader
+         will be create for each process encoding errors handled using
+        ``backslashreplace``.
     :param logger: Name of the logger or a `Logger` instance to use instead of the default.
     :param logLevel: Log level to use instead of the default.
 
     :raises pipettor.ProcessException: If the pipeline fails.
 
     If a :class:`pipettor.DataReader` is provided for `stderr` and the
-    pipeline fails, the contents of stderr from all processes will be included
-    in the :class:`pipettor.ProcessException` object.
+    pipeline fails, the contents of stderr from the first processes that fails will be included
+    in the :class:`pipettor.ProcessException` object.  If an instance of :class:`pipettor.DataReader`
+    is provide, stderr of all processes in combined.
     """
     def __init__(self, cmds, *, stdin=None, stdout=None, stderr=DataReader,
                  logger=None, logLevel=None):
@@ -513,13 +518,12 @@ class Popen(Pipeline):
     :param cmds: A list (or tuple) of arguments for a single process, or a
          list of such lists for a pipeline. Arguments are converted to strings.
     :param mode: `'r'` or `'rb'` for reading from the pipeline, `'w'` or `'wb'` for writing to it. Using `'b'` results in `bytes` input/output instead of `str`.
-    :param stdin: Input to the first process. Can be None (inherit), a
-        filename, file-like object, file descriptor, a :class:`pipettor.File`
-        object, or a :class:`pipettor.DataWriter`.
-    :param stdout: Output from the last process. Same options as `stdin`, or a :class:`pipettor.DataReader`.
-    :param stderr: stderr for all processes. Same options as `stdout`, or the
-        :class:`pipettor.DataReader` class itself. In that case, an instance is
-        created with encoding errors handled using ``backslashreplace``.
+    :param stdin: Input to the first process.  See :class:`pipettor.Pipeline` for a description of
+          possible values.
+    :param stdout: Output from the last process. See :class:`pipettor.Pipeline` for a description of
+          possible values.
+    :param stderr: stderr from the pipeline. See :class:`pipettor.Pipeline` for a description of
+          possible values.
     :param logger: Name of the logger or a `Logger` instance to use instead of the default.
     :param logLevel: Log level to use instead of the default.
     :param buffering: Buffering policy. If 0, unbuffered; 1 for line buffering; any other positive integer sets buffer size. Default is -1 (system default).
@@ -531,9 +535,7 @@ class Popen(Pipeline):
 
     :raises pipettor.ProcessException: If the pipeline fails.
 
-    If a :class:`pipettor.DataReader` is provided for `stderr` and the
-    pipeline fails, the contents of stderr from all processes will be included
-    in the :class:`pipettor.ProcessException` object.
+    See :class:`pipettor.Pipeline` for a description of error handling.
 
     **Pipeline Modes**
 
@@ -548,7 +550,7 @@ class Popen(Pipeline):
     # due to it doing both binary and text I/O.  Probably could do this with
     # some kind of dynamic base class setting.
 
-    def __init__(self, cmds, mode='r', *, stdin=None, stdout=None, logger=None, logLevel=None,
+    def __init__(self, cmds, mode='r', *, stdin=None, stdout=None, stderr=None, logger=None, logLevel=None,
                  buffering=-1, encoding=None, errors=None):
         self.mode = mode
         self._pipeline_fh = None
@@ -573,7 +575,7 @@ class Popen(Pipeline):
             lastOut = stdout
             self._child_fd = pipe_read_fd
             self._pipeline_fh = open(pipe_write_fd, mode, buffering=buffering, encoding=encoding, errors=errors)
-        super().__init__(cmds, stdin=firstIn, stdout=lastOut, logger=logger, logLevel=logLevel)
+        super().__init__(cmds, stdin=firstIn, stdout=lastOut, stderr=stderr, logger=logger, logLevel=logLevel)
         self.start()
         os.close(self._child_fd)
         self._child_fd = None
