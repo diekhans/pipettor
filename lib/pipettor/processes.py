@@ -134,7 +134,7 @@ class Process(object):
         elif isinstance(spec, int):
             return spec
         elif isinstance(spec, Dev):
-            return spec.read_fd if stdfd == 0 else spec.write_fd
+            return spec.get_child_read_fd() if stdfd == 0 else spec.get_child_write_fd()
         else:
             # this should have been detected earlier
             raise PipettorException("_get_child_stdio logic error: {} {}".format(type(spec), stdfd))

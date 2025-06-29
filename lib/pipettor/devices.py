@@ -13,11 +13,9 @@ class Dev:
     provide a way of hide details of setting up interprocess
     communication.
 
-    Derived class implement the following properties, if applicable:
-       read_fd - file integer descriptor for reading
-       read_fh - file object for reading
-       write_fd - file integer descriptor for writing
-       write_fh - file object for writing
+    Derived class implement the following funcions
+       get_child_read_fd() - file integer descriptor for child reading from device
+       get_child_write_fd() - file integer descriptor for child writing to device
     """
 
     def _bind_read_to_process(self, process):
@@ -124,23 +122,8 @@ class DataReader(Dev):
         with self._lock:
             self._buffer.append(data)
 
-    # FIXME: temporary until finish multiple readers (see #31)
-
-    @property
-    def read_fd(self):
-        return self._thread.read_fd
-
-    @property
-    def read_fh(self):
-        return self._thread.read_fh
-
-    @property
-    def write_fd(self):
+    def get_child_write_fd(self):
         return self._thread.write_fd
-
-    @property
-    def write_fh(self):
-        return self._thread.write_fh
 
     @property
     def data(self):
@@ -165,10 +148,10 @@ class DataWriter(Dev):
         self._data = data
         self._thread = None
         self._process = None
-        self.read_fd = self.write_fh = None
-        self.read_fd, write_fd = os.pipe()
+        self._read_fd = self._write_fh = None
+        self._read_fd, write_fd = os.pipe()
         mode = "wb" if binary else "w"
-        self.write_fh = open(write_fd, mode, buffering=buffering, encoding=encoding, errors=errors)
+        self._write_fh = open(write_fd, mode, buffering=buffering, encoding=encoding, errors=errors)
 
     def __str__(self):
         return "[DataWriter]"
@@ -181,30 +164,33 @@ class DataWriter(Dev):
 
     def _post_start_parent(self):
         "called to do any start-exec handling in the parent"
-        os.close(self.read_fd)
-        self.read_fd = None
+        os.close(self._read_fd)
+        self._read_fd = None
         self._thread = threading.Thread(target=self._writer, daemon=True)
         self._thread.start()
+
+    def get_child_read_fd(self):
+        return self._read_fd
 
     def close(self):
         "close pipes and terminate thread"
         if self._thread is not None:
             self._thread.join()
             self._thread = None
-        if self.read_fd is not None:
-            os.close(self.read_fd)
-            self.read_fd = None
-        if self.write_fh is not None:
-            self.write_fh.close()
-            self.write_fh = None
+        if self._read_fd is not None:
+            os.close(self._read_fd)
+            self._read_fd = None
+        if self._write_fh is not None:
+            self._write_fh.close()
+            self._write_fh = None
 
     def _writer(self):
         "write thread function"
-        assert self.read_fd is None
+        assert self._read_fd is None
         try:
-            self.write_fh.write(self._data)
-            self.write_fh.close()
-            self.write_fh = None
+            self._write_fh.write(self._data)
+            self._write_fh.close()
+            self._write_fh = None
         except IOError as ex:
             # don't raise error on broken pipe
             if ex.errno != errno.EPIPE:
@@ -220,13 +206,13 @@ class File(Dev):
         self.path = path
         self.mode = mode
         # only one of the file descriptors is ever opened
-        self.read_fd = self.write_fd = None
+        self._read_fd = self._write_fd = None
         if mode.find('r') >= 0:
-            self.read_fd = os.open(self.path, os.O_RDONLY)
+            self._read_fd = os.open(self.path, os.O_RDONLY)
         elif mode.find('w') >= 0:
-            self.write_fd = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o666)
+            self._write_fd = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o666)
         elif mode.find('a') >= 0:
-            self.write_fd = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o666)
+            self._write_fd = os.open(self.path, os.O_WRONLY | os.O_CREAT | os.O_APPEND, 0o666)
         else:
             raise PipettorException("invalid or unsupported mode '{}' opening {}".format(mode, path))
 
@@ -235,16 +221,24 @@ class File(Dev):
 
     def close(self):
         "close file if open"
-        if self.read_fd is not None:
-            os.close(self.read_fd)
-            self.read_fd = None
-        if self.write_fd is not None:
-            os.close(self.write_fd)
-            self.write_fd = None
+        if self._read_fd is not None:
+            os.close(self._read_fd)
+            self._read_fd = None
+        if self._write_fd is not None:
+            os.close(self._write_fd)
+            self._write_fd = None
 
     def _post_start_parent(self):
         """post-fork child setup."""
         self.close()
+
+    def get_child_write_fd(self):
+        assert self._write_fd is not None
+        return self._write_fd
+
+    def get_child_read_fd(self):
+        assert self._read_fd is not None
+        return self._read_fd
 
 
 class _SiblingPipe(Dev):
@@ -253,22 +247,28 @@ class _SiblingPipe(Dev):
 
     def __init__(self):
         super().__init__()
-        self.read_fd, self.write_fd = os.pipe()
+        self._read_fd, self._write_fd = os.pipe()
 
     def __str__(self):
         return "[Pipe]"
 
     def _post_start_parent(self):
         "called to do any post-exec handling in the parent"
-        os.close(self.read_fd)
-        self.read_fd = None
-        os.close(self.write_fd)
-        self.write_fd = None
+        os.close(self._read_fd)
+        self._read_fd = None
+        os.close(self._write_fd)
+        self._write_fd = None
+
+    def get_child_write_fd(self):
+        return self._write_fd
+
+    def get_child_read_fd(self):
+        return self._read_fd
 
     def close(self):
-        if self.read_fd is not None:
-            os.close(self.read_fd)
-            self.read_fd = None
-        if self.write_fd is not None:
-            os.close(self.write_fd)
-            self.write_fd = None
+        if self._read_fd is not None:
+            os.close(self._read_fd)
+            self._read_fd = None
+        if self._write_fd is not None:
+            os.close(self._write_fd)
+            self._write_fd = None

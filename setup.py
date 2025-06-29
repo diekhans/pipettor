@@ -26,6 +26,7 @@ extras_require={
         "PyYAML>=3.11",
         "twine>=1.11",
         "pytest>=5.3",
+        "pytest-xdist>=3.6",
         "vulture>=2.1",
     ],
 }
