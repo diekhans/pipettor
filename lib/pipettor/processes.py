@@ -573,7 +573,7 @@ class Popen(Pipeline):
             lastOut = stdout
             self._child_fd = pipe_read_fd
             self._pipeline_fh = open(pipe_write_fd, mode, buffering=buffering, encoding=encoding, errors=errors)
-        super(Popen, self).__init__(cmds, stdin=firstIn, stdout=lastOut, logger=logger, logLevel=logLevel)
+        super().__init__(cmds, stdin=firstIn, stdout=lastOut, logger=logger, logLevel=logLevel)
         self.start()
         os.close(self._child_fd)
         self._child_fd = None
@@ -714,7 +714,7 @@ class Popen(Pipeline):
         exits no-zero"""
         with self.lock:
             self._close()
-            super(Popen, self).wait()
+            super().wait()
 
     def poll(self):
         "poll is not allowed for Pipeline objects"

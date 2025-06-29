@@ -99,7 +99,7 @@ class DataReader(Dev):
     A reader maybe read from multiple process.
     """
     def __init__(self, *, binary=False, buffering=-1, encoding=None, errors=None):
-        super(DataReader, self).__init__()
+        super().__init__()
         self.binary = binary
         self._buffer = []
         self._lock = threading.Lock()
@@ -160,7 +160,7 @@ class DataWriter(Dev):
     """
 
     def __init__(self, data, *, buffering=-1, encoding=None, errors=None):
-        super(DataWriter, self).__init__()
+        super().__init__()
         binary = not isinstance(data, str)
         self._data = data
         self._thread = None
@@ -216,7 +216,7 @@ class File(Dev):
     with files. Mode is one of `r`, `w`, or `a`"""
 
     def __init__(self, path, mode="r"):
-        super(File, self).__init__()
+        super().__init__()
         self.path = path
         self.mode = mode
         # only one of the file descriptors is ever opened
@@ -252,7 +252,7 @@ class _SiblingPipe(Dev):
     pipes."""
 
     def __init__(self):
-        super(_SiblingPipe, self).__init__()
+        super().__init__()
         self.read_fd, self.write_fd = os.pipe()
 
     def __str__(self):

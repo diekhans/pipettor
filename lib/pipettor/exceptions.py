@@ -36,7 +36,7 @@ class ProcessException(PipettorException):
             msg += ": " + procDesc
         if (stderr is not None) and (len(stderr) != 0):
             msg += ":\n" + stderr
-        super(ProcessException, self).__init__(msg)
+        super().__init__(msg)
 
     def __reduce__(self):
         # __reduce__ is used, otherwise we had problems with the msg having
