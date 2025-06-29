@@ -95,11 +95,14 @@ class DataReader(Dev):
     Specifying binary access results in data of type bytes, otherwise str type
     is returned.  The buffering, encoding, and errors arguments are as used in
     the open() function.
+
+    A reader maybe read from multiple process.
     """
     def __init__(self, *, binary=False, buffering=-1, encoding=None, errors=None):
         super(DataReader, self).__init__()
         self.binary = binary
         self._buffer = []
+        self._lock = threading.Lock()
         self._thread = _ReaderThread(self._readfn, binary, buffering, encoding, errors)
 
     def __str__(self):
@@ -114,11 +117,12 @@ class DataReader(Dev):
 
     def close(self):
         "close pipes and terminate thread"
-        self._thread.post_start_parent()
+        self._thread.close()
 
     def _readfn(self, data):
         "store to buffer"
-        self._buffer.append(data)
+        with self._lock:
+            self._buffer.append(data)
 
     # FIXME: temporary until finish multiple readers (see #31)
 
