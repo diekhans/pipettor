@@ -2,7 +2,7 @@
 root = .
 include ${root}/defs.mk
 
-version = $(shell PYTHONPATH=lib ${PYTHON} -c "import pipettor; print(pipettor.__version__)")
+version = $(shell ${PYTHON} -c "import pipettor; print(pipettor.__version__)")
 
 ifeq ($(shell uname),Darwin)
   BROWSER = open
@@ -77,21 +77,18 @@ vulture:
 	${PYTHON} -m vulture lib/pipettor tests
 
 test:
-	${SET_TREE_PYTHONPATH} ${PYTEST} tests
+	${PYTEST} tests
 
 test-all:
 	tox
 
 coverage:
-	${SET_TREE_PYTHONPATH} ${COVERAGE} run -m pytest ${PYTEST_OPTS} tests
+	${COVERAGE} run -m pytest ${PYTEST_OPTS} tests
 	${COVERAGE} report -m
 	${COVERAGE} html
 	${browser} htmlcov/index.html
 
 docs:
-	rm -f docs/pipettor.rst
-	rm -f docs/modules.rst
-	sphinx-apidoc -o docs/ lib
 	$(MAKE) -C docs clean
 	$(MAKE) -C docs html
 

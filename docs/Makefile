@@ -18,7 +18,10 @@ ALLSPHINXOPTS   = -d $(BUILDDIR)/doctrees $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) .
 # the i18n builder cannot share the environment and doctrees with the others
 I18NSPHINXOPTS  = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) .
 
-APIDOC_RST = modules.rst pipettor.rst
+# pipettor note:
+# apidoc is not needed as we explcity specify what to import from __init__.py
+# using apidoc brings in submodules, duplicating documentation.
+APIDOC_RST = 
 
 
 .PHONY: help clean html dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest gettext
@@ -179,6 +182,3 @@ pseudoxml: ${APIDOC_RST}
 	@echo
 	@echo "Build finished. The pseudo-XML files are in $(BUILDDIR)/pseudoxml."
 
-
-${APIDOC_RST} &: $(wildcard ../lib/pipettor/*.py)
-	${SPHINXAPIDOC} -o . ../lib/pipettor

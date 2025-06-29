@@ -5,42 +5,61 @@ Pipettor Library
 Function Interface
 ------------------
 .. autofunction:: pipettor.run
-   :noindex:
+
 .. autofunction:: pipettor.runout
-   :noindex:
+
 .. autofunction:: pipettor.runlex
-   :noindex:
+
 .. autofunction:: pipettor.runlexout
-   :noindex:
+   
 
 Pipeline Classes
 ----------------
 .. autoclass:: pipettor.Pipeline
-   :noindex:
+   :members:
+   :undoc-members:
+   :inherited-members:
+      
 .. autoclass:: pipettor.Popen
-   :noindex:
+   :members:
+   :undoc-members:
+   :inherited-members:
                   
 
 Process I/O Classes
 -------------------
 .. autoclass:: pipettor.DataReader
-   :noindex:
+   :members:
+   :undoc-members:
+   :inherited-members:
+   
 .. autoclass:: pipettor.DataWriter
-   :noindex:
+   :members:
+   :undoc-members:
+   :inherited-members:
+   
 .. autoclass:: pipettor.File
-   :noindex:
-
+   :members:
+   :undoc-members:
+   :inherited-members:
+  
 
 Logging Control
 ---------------
 .. autofunction:: pipettor.setDefaultLogger
-   :noindex:
+   
 .. autofunction:: pipettor.getDefaultLogger
-   :noindex:
+   
 
 Exceptions
 ----------
 .. autoclass:: pipettor.PipettorException
-   :noindex:
+   :members:
+   :undoc-members:
+   :inherited-members:
+   
 .. autoclass:: pipettor.ProcessException
-   :noindex:
+   :members:
+   :undoc-members:
+   :inherited-members:
+   

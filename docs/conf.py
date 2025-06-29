@@ -14,22 +14,20 @@
 # serve to show the default.
 
 import sys
-import os
+import os.path as osp
 
 # If extensions (or modules to document with autodoc) are in another
 # directory, add these directories to sys.path here. If the directory is
 # relative to the documentation root, use os.path.abspath to make it
-# absolute, like shown here.
-#sys.path.insert(0, os.path.abspath('.'))
+# absolute
 
-# Get the project root dir, which is the parent dir of this
-cwd = os.getcwd()
-project_root = os.path.dirname(cwd)
+# Get the project root dir, which is the parent dir of this file
+project_root = osp.normpath(osp.abspath(osp.join(osp.dirname(__file__), '..')))
 
 # Insert the project root dir src as the first element in the PYTHONPATH.
 # This lets us ensure that the source package is imported, and that its
 # version is used.
-sys.path.insert(0, os.path.join(project_root, "lib"))
+sys.path.insert(0, osp.join(project_root, "lib"))
 
 import pipettor
 
@@ -41,9 +39,11 @@ import pipettor
 # Add any Sphinx extension module names here, as strings. They can be
 # extensions coming with Sphinx (named 'sphinx.ext.*') or your custom ones.
 extensions = [
-    'sphinx.ext.autodoc',
-    'sphinx.ext.viewcode'
+    'sphinx.ext.viewcode',
+    'sphinx.ext.autosummary',
+    'sphinx.ext.napoleon',
 ]
+autosummary_generate = True
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = ['_templates']
@@ -82,7 +82,9 @@ release = pipettor.__version__
 
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
-exclude_patterns = ['_build']
+exclude_patterns = [
+    '_build',
+]
 
 # The reST default role (used for this markup: `text`) to use for all
 # documents.

@@ -6,8 +6,7 @@ from pipettor.exceptions import PipettorException, ProcessException
 from pipettor.devices import DataReader, DataWriter, File
 from pipettor.processes import Pipeline, Popen, setDefaultLogger, getDefaultLogger, setDefaultLogLevel, getDefaultLogLevel, setDefaultLogging
 
-__version__ = "1.1.0"
-
+__version__ = "1.2.0b1"
 
 def run(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLevel=None):
     """
@@ -16,27 +15,28 @@ def run(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLevel=
 
     :param cmds: A list (or tuple) of arguments for a single process, or a
         list of such lists for a pipeline. Arguments are converted to strings.
-    :param stdin: Input to the first process. Can be None (inherit), a
-         filename, file-like object, file descriptor, a :class:`pipettor.File`
-         object, or a :class:`pipettor.DataWriter` object.
-    :param stdout: Output from the last process. Can be None (inherit), a
-         filename, file-like object, file descriptor, a :class:`pipettor.File`
-         object, or a :class:`pipettor.DataReader` object.
-    :param stderr: stderr for the pipeline.  Can be None (inherit), a
-         filename, file-like object, file descriptor, a :class:`pipettor.File`
-         object, or a :class:`pipettor.DataReader` object.  It may also be the
-         class :class:`pipettor.DataReader` itself, in which case a DataReader
-         will be create for each process encoding errors handled using
-        ``backslashreplace``.
+    :param stdin: Input to the first process. Can be None (inherit), a filename,
+        file-like object, file descriptor, a :class:`pipettor.File` object,
+        or a :class:`pipettor.DataWriter` object.
+    :param stdout: Output from the last process. Can be None (inherit), a filename,
+        file-like object, file descriptor, a :class:`pipettor.File` object,
+        or a :class:`pipettor.DataReader` object.
+    :param stderr: stderr for the pipeline. Can be None (inherit), a filename,
+        file-like object, file descriptor, a :class:`pipettor.File` object,
+        or a :class:`pipettor.DataReader` object. It may also be the
+        class :class:`pipettor.DataReader` itself, in which case a
+        :class:`pipettor.DataReader` will be created for each process with
+        encoding errors handled using ``backslashreplace``.
     :param logger: Name of the logger or a `Logger` instance to use instead of the default.
     :param logLevel: Log level to use instead of the default.
 
     :raises pipettor.ProcessException: If the pipeline fails.
 
     If a :class:`pipettor.DataReader` is provided for `stderr` and the
-    pipeline fails, the contents of stderr from the first processes that fails will be included
-    in the :class:`pipettor.ProcessException` object.  If an instance of :class:`pipettor.DataReader`
-    is provide, stderr of all processes in combined.
+    pipeline fails, the contents of stderr from the first process that fails
+    will be included in the :class:`pipettor.ProcessException` object.
+    If an instance of :class:`pipettor.DataReader` is provided, stderr
+    from all processes is combined.
     """
     Pipeline(cmds, stdin=stdin, stdout=stdout, stderr=stderr, logger=logger, logLevel=logLevel).wait()
 

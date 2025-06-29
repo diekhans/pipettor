@@ -237,18 +237,18 @@ class Pipeline(object):
     the :meth:`start`, :meth:`poll`, or :meth:`wait` functions.
 
     :param cmds: A list (or tuple) of arguments for a single process, or a
-         list of such lists for a pipeline. Arguments are converted to strings.
+        list of such lists for a pipeline. Arguments are converted to strings.
     :param stdin: Input to the first process. Can be None (inherit), a
-         filename, file-like object, file descriptor, a :class:`pipettor.File`
-         object, or a :class:`pipettor.DataWriter` object.
+        filename, file-like object, file descriptor, a :class:`pipettor.File`
+        object, or a :class:`pipettor.DataWriter` object.
     :param stdout: Output from the last process. Can be None (inherit), a
-         filename, file-like object, file descriptor, a :class:`pipettor.File`
-         object, or a :class:`pipettor.DataReader` object.
-    :param stderr: stderr for the pipeline.  Can be None (inherit), a
-         filename, file-like object, file descriptor, a :class:`pipettor.File`
-         object, or a :class:`pipettor.DataReader` object.  It may also be the
-         class :class:`pipettor.DataReader` itself, in which case a DataReader
-         will be create for each process encoding errors handled using
+        filename, file-like object, file descriptor, a :class:`pipettor.File`
+        object, or a :class:`pipettor.DataReader` object.
+    :param stderr: stderr for the pipeline. Can be None (inherit), a
+        filename, file-like object, file descriptor, a :class:`pipettor.File`
+        object, or a :class:`pipettor.DataReader` object. It may also be the
+        class :class:`pipettor.DataReader` itself, in which case a DataReader
+        will be created for each process with encoding errors handled using
         ``backslashreplace``.
     :param logger: Name of the logger or a `Logger` instance to use instead of the default.
     :param logLevel: Log level to use instead of the default.
@@ -256,9 +256,10 @@ class Pipeline(object):
     :raises pipettor.ProcessException: If the pipeline fails.
 
     If a :class:`pipettor.DataReader` is provided for `stderr` and the
-    pipeline fails, the contents of stderr from the first processes that fails will be included
-    in the :class:`pipettor.ProcessException` object.  If an instance of :class:`pipettor.DataReader`
-    is provide, stderr of all processes in combined.
+    pipeline fails, the contents of stderr from the first process that fails
+    will be included in the :class:`pipettor.ProcessException` object. If an
+    instance of :class:`pipettor.DataReader` is provided, stderr from all
+    processes is combined.
     """
     def __init__(self, cmds, *, stdin=None, stdout=None, stderr=DataReader,
                  logger=None, logLevel=None):

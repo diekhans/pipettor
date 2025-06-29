@@ -22,7 +22,10 @@ PIP = pip3
 COVERAGE = ${PYTHON} -m coverage
 TWINE = ${PYTHON} -m twine
 
-SET_TREE_PYTHONPATH = PYTHONPATH=lib:${PYTHONPATH}
-export PYTHONPATH:=${root}/lib:${PYTHONPATH}
+# ensure all commands use local rather than install
+ifneq (${TREE_PYTHON_PATHSET},yes)
+    export PYTHONPATH:=${root}/lib:${PYTHONPATH}
+    export TREE_PYTHON_PATHSET=yes
+endif
 export PYTHONWARNINGS=always
 
