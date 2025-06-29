@@ -8,18 +8,6 @@ import threading
 from pipettor.exceptions import PipettorException
 
 
-# note:
-# A problem with python threads and signal handling is that SIGINT (C-c) will
-# not raise an exception if it's blocked in thread join.  If the thread never
-# terminates, the process hangs, not responding to SIGINT.  This can happen if
-# the forked process is hung.  to work around this, setting the I/O threads to
-# daemon solves the problem.  It also cause the process to to wait if the main
-# process exists and close hasn't been called.
-#
-#  http://bugs.python.org/issue21822
-#  http://code.activestate.com/recipes/496735-workaround-for-missed-sigint-in-multithreaded-prog/
-
-
 class Dev:
     """Base class for objects specifying process input or output.  They
     provide a way of hide details of setting up interprocess
@@ -79,8 +67,7 @@ class _ReaderThread:
         os.close(self.write_fd)
         self.write_fd = None
 
-        self._thread = threading.Thread(target=self._reader)
-        self._thread.daemon = True  # see note at top of this file
+        self._thread = threading.Thread(target=self._reader, daemon=True)
         self._thread.start()
 
     def close(self):
@@ -130,7 +117,7 @@ class DataReader(Dev):
         self._thread.post_start_parent()
 
     def _readfn(self, data):
-        "store to buffer n"
+        "store to buffer"
         self._buffer.append(data)
 
     # FIXME: temporary until finish multiple readers (see #31)
@@ -192,8 +179,7 @@ class DataWriter(Dev):
         "called to do any start-exec handling in the parent"
         os.close(self.read_fd)
         self.read_fd = None
-        self._thread = threading.Thread(target=self._writer)
-        self._thread.daemon = True  # see note at top of this file
+        self._thread = threading.Thread(target=self._writer, daemon=True)
         self._thread.start()
 
     def close(self):

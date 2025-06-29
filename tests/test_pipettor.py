@@ -5,6 +5,7 @@ import sys
 import os
 import re
 import signal
+import tracemalloc
 from pathlib import Path
 
 if __name__ == '__main__':
@@ -28,6 +29,8 @@ signal.signal(signal.SIGQUIT,
 signal.signal(signal.SIGABRT,
               lambda signum, frame: sys.exit(os.EX_SOFTWARE))
 
+def setup_module(module):
+    tracemalloc.start()
 
 class PipettorTestBase(TestCaseBase):
     "provide common functions used in test classes"
