@@ -1,6 +1,11 @@
+* set versions in:
+- lib/pipettor/__init__.py
+- setup.py
 * install with development dependencies
-```pip install -e .[dev]```
+pip install -e .[dev]
 * development testing
+** start clean
+make clean
 ** check code with fake8:
 make lint
 ** run tests with default python:
@@ -13,7 +18,6 @@ make test-all
   - conda create -n py310 python=3.10
     conda activate py310
     conda install tox
-     
 ** test install from local dist:
 make test-pip
 ** check test coverage:

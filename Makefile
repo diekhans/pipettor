@@ -28,7 +28,7 @@ define envsetup
 	mkdir -p ${testenv}
 	${PYTHON} -m virtualenv --quiet ${testenv}
 endef
-envact = cd ${testenv} && source ./bin/activate
+envact = source ${testenv}/bin/activate
 
 help:
 	@echo "clean - remove all build, test, coverage and Python artifacts"
@@ -54,21 +54,17 @@ help:
 clean: clean-build clean-pyc clean-test clean-docs
 
 clean-build:
-	rm -fr build/ dist/ .eggs/ ${testenv}/ pipettor.egg-info/
+	rm -fr build/ dist/ .eggs/ ${testenv}/ lib/pipettor.egg-info/
 
 clean-pyc:
 	rm -fr lib/pipettor/__pycache__ tests/__pycache__
-
 
 clean-docs:
 	rm -f docs/pipettor.rst docs/modules.rst
 	$(MAKE) -C docs clean
 
 clean-test:
-	rm -fr .tox/
-	rm -f .coverage
-	rm -fr htmlcov/
-	rm -fr tests/output/
+	rm -fr .tox/ htmlcov/ .coverage htmlcov/ tests/output/ .pytest_cache/
 
 lint:
 	${PYTHON} -m flake8 --color=never lib/pipettor tests
@@ -86,7 +82,7 @@ coverage:
 	${COVERAGE} run -m pytest ${PYTEST_OPTS} tests
 	${COVERAGE} report -m
 	${COVERAGE} html
-	${browser} htmlcov/index.html
+	${BROWSER} htmlcov/index.html
 
 docs:
 	$(MAKE) -C docs clean
@@ -105,8 +101,8 @@ dist: clean
 # test install locally
 test-pip: dist
 	${envsetup}
-	${envact} && pip install --no-cache-dir ../dist/pipettor-${version}.tar.gz
-	${envact} && ${PYTHON} ../tests/test_pipettor.py
+	${envact} && pip install --no-cache-dir dist/pipettor-${version}-py3-none-any.whl[dev]
+	${envact} && ${PYTEST} tests
 
 dist_wheel = dist/pipettor-${version}-py3-none-any.whl
 dist_tar = dist/pipettor-${version}.tar.gz
