@@ -1,6 +1,4 @@
-* set versions in:
-- lib/pipettor/__init__.py
-- setup.py
+* version is set below with bumpversion
 * install with development dependencies
 pip install -e .[dev]
 * development testing

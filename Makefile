@@ -115,7 +115,7 @@ release-testpypi: dist
 test-release-testpypi:
 	${envsetup}
 	${envact} && pip install --no-cache-dir --index-url=${testpypi_url} pipettor==${version}
-	${envact} && ${PYTHON} ../tests/test_pipettor.py
+	${envact} && ${PYTEST} tests
 
 release: dist
 	${TWINE} upload --repository=pypi ${dist_wheel} ${dist_tar}
@@ -123,6 +123,6 @@ release: dist
 release-test:
 	${envsetup}
 	${envact} && pip install --no-cache-dir pipettor==${version}
-	${envact} && ${PYTHON} ../tests/test_pipettor.py
+	${envact} && ${PYTEST} tests
 
 
