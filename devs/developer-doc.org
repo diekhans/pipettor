@@ -7,6 +7,13 @@ make lint
 make test
 ** run tests with all support python versions:
 make test-all
+- make sure tox.ini is in sync with minimum versiono claimed in setup.py
+- This does not work well with conda, since it can have only one version in a
+  environment. Create a environment for the minimum in needed with:
+  - conda create -n py310 python=3.10
+    conda activate py310
+    conda install tox
+     
 ** test install from local dist:
 make test-pip
 ** check test coverage:
