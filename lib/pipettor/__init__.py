@@ -8,7 +8,7 @@ from pipettor.devices import DataReader, DataWriter, File
 from pipettor.processes import LOGGER_NAME  # noqa
 from pipettor.processes import Pipeline, Popen, setDefaultLogger, getDefaultLogger, setDefaultLogLevel, getDefaultLogLevel, setDefaultLogging
 
-__version__ = "1.2.0"
+__version__ = "1.2.1"
 
 def run(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLevel=None):
     """
