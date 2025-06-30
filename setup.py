@@ -4,17 +4,14 @@
 
 import setuptools
 
-
 with open('README.rst') as readme_file:
     readme = readme_file.read()
 
-with open('HISTORY.rst') as history_file:
-    history = history_file.read().replace('.. :changelog:', '')
 
 requirements = [
 ]
 
-extras_require={
+extras_require = {
     "dev": [
         "bumpversion>=0.5.3",
         "wheel>=0.23.0",
@@ -35,7 +32,7 @@ setuptools.setup(
     name = 'pipettor',
     version = '1.1.0',
     description = "pipettor - robust, easy to use Unix process pipelines",
-    long_description = readme + '\n\n' + history,
+    long_description = readme,
     long_description_content_type="text/markdown",
     author = "Mark Diekhans",
     author_email = 'markd@ucsc.edu',
@@ -46,6 +43,7 @@ setuptools.setup(
     package_dir = {'': 'lib'},
     include_package_data = True,
     install_requires = requirements,
+    extras_require = extras_require,
     license = "MIT",
     zip_safe = True,
     keywords = ['Unix', 'process', 'pipe'],
@@ -54,13 +52,13 @@ setuptools.setup(
         'Intended Audience :: Developers',
         'Natural Language :: English',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.9',
         'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: 3.11',
         'Programming Language :: Python :: 3.12',
+        'Programming Language :: Python :: 3.13',
         'Operating System :: POSIX',
         'Operating System :: MacOS :: MacOS X',
         'Topic :: Software Development :: Libraries :: Python Modules'
     ],
-    python_requires='>=3.7',
+    python_requires='>=3.10',
 )
