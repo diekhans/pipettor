@@ -32,34 +32,41 @@ Process I/O Classes
    :members:
    :undoc-members:
    :inherited-members:
+   :exclude-members: get_child_read_fd,  get_child_write_fd
    
 .. autoclass:: pipettor.DataWriter
    :members:
    :undoc-members:
    :inherited-members:
+   :exclude-members: get_child_read_fd,  get_child_write_fd
    
 .. autoclass:: pipettor.File
    :members:
    :undoc-members:
    :inherited-members:
+   :exclude-members: get_child_read_fd,  get_child_write_fd
   
 
 Logging Control
 ---------------
+.. autofunction:: pipettor.setDefaultLogging
+
 .. autofunction:: pipettor.setDefaultLogger
    
 .. autofunction:: pipettor.getDefaultLogger
-   
+
+.. autofunction:: pipettor.setDefaultLogLevel
+
+.. autofunction:: pipettor.getDefaultLogLevel
+
 
 Exceptions
 ----------
 .. autoclass:: pipettor.PipettorException
    :members:
    :undoc-members:
-   :inherited-members:
    
 .. autoclass:: pipettor.ProcessException
    :members:
    :undoc-members:
-   :inherited-members:
    

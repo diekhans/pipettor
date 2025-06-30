@@ -29,3 +29,5 @@ ifneq (${TREE_PYTHON_PATHSET},yes)
 endif
 export PYTHONWARNINGS=always
 
+# prevent warnings about emacs terminal from pytest-xdist
+export TERM=dumb

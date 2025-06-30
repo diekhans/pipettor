@@ -11,6 +11,7 @@ import enum
 from pathlib import Path
 from io import UnsupportedOperation
 from threading import RLock
+from pipettor.docstrings import doc_open_mode_arg, doc_cmd_std_args, doc_open_other_args, doc_raises, doc_error_handling
 from pipettor.devices import Dev
 from pipettor.devices import DataReader
 from pipettor.devices import _SiblingPipe
@@ -233,34 +234,12 @@ class Process(object):
 
 class Pipeline(object):
     """
-    A process pipeline. Once constructed, the pipeline is started with
-    the :meth:`start`, :meth:`poll`, or :meth:`wait` functions.
+    Create and run a process pipeline.  Create an instances setups a project
+    to run.  Once constructed, the pipeline is started with the :meth:`start`,
+    :meth:`poll`, or :meth:`wait` functions.
 
-    :param cmds: A list (or tuple) of arguments for a single process, or a
-        list of such lists for a pipeline. Arguments are converted to strings.
-    :param stdin: Input to the first process. Can be None (inherit), a
-        filename, file-like object, file descriptor, a :class:`pipettor.File`
-        object, or a :class:`pipettor.DataWriter` object.
-    :param stdout: Output from the last process. Can be None (inherit), a
-        filename, file-like object, file descriptor, a :class:`pipettor.File`
-        object, or a :class:`pipettor.DataReader` object.
-    :param stderr: stderr for the pipeline. Can be None (inherit), a
-        filename, file-like object, file descriptor, a :class:`pipettor.File`
-        object, or a :class:`pipettor.DataReader` object. It may also be the
-        class :class:`pipettor.DataReader` itself, in which case a DataReader
-        will be created for each process with encoding errors handled using
-        ``backslashreplace``.
-    :param logger: Name of the logger or a `Logger` instance to use instead of the default.
-    :param logLevel: Log level to use instead of the default.
+    """   # doc extended below after class creation
 
-    :raises pipettor.ProcessException: If the pipeline fails.
-
-    If a :class:`pipettor.DataReader` is provided for `stderr` and the
-    pipeline fails, the contents of stderr from the first process that fails
-    will be included in the :class:`pipettor.ProcessException` object. If an
-    instance of :class:`pipettor.DataReader` is provided, stderr from all
-    processes is combined.
-    """
     def __init__(self, cmds, *, stdin=None, stdout=None, stderr=DataReader,
                  logger=None, logLevel=None):
         self.lock = RLock()
@@ -512,47 +491,29 @@ class Pipeline(object):
             os.kill(p.pid, sig)
 
 
+# extend documentation from common text
+Pipeline.__doc__ += doc_cmd_std_args
+
 class Popen(Pipeline):
     """
     File-like object of processes to read from or write to a Pipeline.
-
-    :param cmds: A list (or tuple) of arguments for a single process, or a
-         list of such lists for a pipeline. Arguments are converted to strings.
-    :param mode: `'r'` or `'rb'` for reading from the pipeline, `'w'` or `'wb'` for writing to it. Using `'b'` results in `bytes` input/output instead of `str`.
-    :param stdin: Input to the first process.  See :class:`pipettor.Pipeline` for a description of
-          possible values.
-    :param stdout: Output from the last process. See :class:`pipettor.Pipeline` for a description of
-          possible values.
-    :param stderr: stderr from the pipeline. See :class:`pipettor.Pipeline` for a description of
-          possible values.
-    :param logger: Name of the logger or a `Logger` instance to use instead of the default.
-    :param logLevel: Log level to use instead of the default.
-    :param buffering: Buffering policy. If 0, unbuffered; 1 for line buffering; any other positive integer sets buffer size. Default is -1 (system default).
-    :type buffering: int, optional
-    :param encoding: Name of the encoding used to decode or encode the file. Only used in text mode. Defaults to None (system default).
-    :type encoding: str, optional
-    :param errors: Specifies how encoding/decoding errors are handled. Defaults to None (system default).
-    :type errors: str, optional
-
-    :raises pipettor.ProcessException: If the pipeline fails.
-
-    See :class:`pipettor.Pipeline` for a description of error handling.
-
-    **Pipeline Modes**
+    Only one of ``stdin`` or ``stdout`` maybe specified, with the
+    other end being read or written via the Popen instance.
 
     - Read pipeline (`'r'`):
       stdin → cmd[0] → ... → cmd[n] → Popen
 
     - Write pipeline (`'w'`):
       Popen → cmd[0] → ... → cmd[n] → stdout
-    """
+
+    """   # doc extended below after class creation
 
     # note: this follows I/O _pyio.py structure, but doesn't extend those class
     # due to it doing both binary and text I/O.  Probably could do this with
     # some kind of dynamic base class setting.
 
     def __init__(self, cmds, mode='r', *, stdin=None, stdout=None, stderr=None, logger=None, logLevel=None,
-                 buffering=-1, encoding=None, errors=None):
+                 buffering=-1, encoding=None, errors=None, newline=None):
         self.mode = mode
         self._pipeline_fh = None
         self._child_fd = None
@@ -570,12 +531,14 @@ class Popen(Pipeline):
             firstIn = stdin
             lastOut = pipe_write_fd
             self._child_fd = pipe_write_fd
-            self._pipeline_fh = open(pipe_read_fd, mode, buffering=buffering, encoding=encoding, errors=errors)
+            self._pipeline_fh = open(pipe_read_fd, mode, buffering=buffering,
+                                     encoding=encoding, errors=errors, newline=newline)
         else:
             firstIn = pipe_read_fd
             lastOut = stdout
             self._child_fd = pipe_read_fd
-            self._pipeline_fh = open(pipe_write_fd, mode, buffering=buffering, encoding=encoding, errors=errors)
+            self._pipeline_fh = open(pipe_write_fd, mode, buffering=buffering,
+                                     encoding=encoding, errors=errors, newline=newline)
         super().__init__(cmds, stdin=firstIn, stdout=lastOut, stderr=stderr, logger=logger, logLevel=logLevel)
         self.start()
         os.close(self._child_fd)
@@ -725,3 +688,8 @@ class Popen(Pipeline):
         # exiting so we can get a status, so disallow it. Not sure how to
         # address this.  Can probably address this with select on pipe.
         self._unsupported("poll")
+
+
+# extend documentation from common text
+Popen.__doc__ += (doc_open_mode_arg + doc_cmd_std_args + doc_open_other_args + doc_raises +
+                  "\n" + doc_error_handling)

@@ -2,6 +2,7 @@
 Robust, easy to use Unix process pipelines.
 """
 import shlex
+from pipettor.docstrings import doc_cmd_std_args, doc_open_other_args, doc_raises, doc_error_handling
 from pipettor.exceptions import PipettorException, ProcessException
 from pipettor.devices import DataReader, DataWriter, File
 from pipettor.processes import Pipeline, Popen, setDefaultLogger, getDefaultLogger, setDefaultLogLevel, getDefaultLogLevel, setDefaultLogging
@@ -10,60 +11,43 @@ __version__ = "1.2.0b1"
 
 def run(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLevel=None):
     """
-    Construct and run a process pipeline. If any of the processes fail,
-    a :class:`pipettor.ProcessException` is raised.
+    Construct and run a process pipeline.
 
-    :param cmds: A list (or tuple) of arguments for a single process, or a
-        list of such lists for a pipeline. Arguments are converted to strings.
-    :param stdin: Input to the first process. Can be None (inherit), a filename,
-        file-like object, file descriptor, a :class:`pipettor.File` object,
-        or a :class:`pipettor.DataWriter` object.
-    :param stdout: Output from the last process. Can be None (inherit), a filename,
-        file-like object, file descriptor, a :class:`pipettor.File` object,
-        or a :class:`pipettor.DataReader` object.
-    :param stderr: stderr for the pipeline. Can be None (inherit), a filename,
-        file-like object, file descriptor, a :class:`pipettor.File` object,
-        or a :class:`pipettor.DataReader` object. It may also be the
-        class :class:`pipettor.DataReader` itself, in which case a
-        :class:`pipettor.DataReader` will be created for each process with
-        encoding errors handled using ``backslashreplace``.
-    :param logger: Name of the logger or a `Logger` instance to use instead of the default.
-    :param logLevel: Log level to use instead of the default.
-
-    :raises pipettor.ProcessException: If the pipeline fails.
-
-    If a :class:`pipettor.DataReader` is provided for `stderr` and the
-    pipeline fails, the contents of stderr from the first process that fails
-    will be included in the :class:`pipettor.ProcessException` object.
-    If an instance of :class:`pipettor.DataReader` is provided, stderr
-    from all processes is combined.
-    """
+    """    # doc extended below after class creation
     Pipeline(cmds, stdin=stdin, stdout=stdout, stderr=stderr, logger=logger, logLevel=logLevel).wait()
 
 
-def runout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None,
-           buffering=-1, encoding=None, errors=None, binary=False):
+# extend documentation from common text
+run.__doc__ += doc_cmd_std_args
+
+
+def runout(cmds, stdin=None, stderr=DataReader, binary=False, logger=None, logLevel=None,
+           buffering=-1, encoding=None, errors=None, newline=None):
     """
     Construct and run a process pipeline, returning the output.
-    If any of the processes fail, a :class:`pipettor.ProcessException` is raised.
 
-    See the :func:`pipettor.run` function for more details. Use
-    ``str.splitlines()`` to split the result into lines.
-
-    :raises pipettor.ProcessException: If the pipeline fails.
-    """
-    dr = DataReader(binary=binary, buffering=buffering, encoding=encoding, errors=errors)
+    """    # doc extended below after class creation
+    dr = DataReader(binary=binary, buffering=buffering,
+                    encoding=encoding, errors=errors, newline=newline)
     Pipeline(cmds, stdin=stdin, stdout=dr, stderr=stderr,
              logger=logger, logLevel=logLevel).wait()
     return dr.data
 
+
+# extend documentation from common text
+runout.__doc__ += doc_cmd_std_args + doc_open_other_args + doc_raises + """
+
+Use ``str.splitlines()`` to split the result into lines.
+
+""" + doc_error_handling
 
 def _lexcmds(cmds):
     """spit pipeline specification into arguments"""
     if isinstance(cmds, str):
         return shlex.split(cmds)
     else:
-        return [shlex.split(cmd) if isinstance(cmd, str) else cmd for cmd in cmds]
+        return [shlex.split(cmd) if isinstance(cmd, str) else cmd
+                for cmd in cmds]
 
 
 def runlex(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLevel=None):
