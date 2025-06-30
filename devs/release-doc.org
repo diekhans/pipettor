@@ -1,6 +1,8 @@
 * version is set below with bumpversion
 * install with development dependencies
 pip install -e .[dev]
+* make sure CHANGELOG.md is current including release data!
+* make sure readthedocs is building!
 * development testing
 ** start clean
 make clean
