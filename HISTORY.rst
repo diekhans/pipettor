@@ -8,7 +8,7 @@ History
 * Support DataReader reading from multiple processes.  This allows collecting stderr
   from all processes in a pipeline.
 * Can now override stderr in Popen.
-* The default logger is now named ``pippetor``. This can be overridden for
+* The default logger is now named ``pipettor``. This can be overridden for
   given calls to better align with the logging approach of the calling code.
 
 1.1.0 (2025-03-31)
