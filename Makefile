@@ -89,7 +89,7 @@ docs:
 	$(MAKE) -C docs html
 
 docs-open: docs
-	${browser} docs/_build/html/index.html
+	${BROWSER} docs/_build/html/index.html
 
 install: clean
 	${PIP} install .
