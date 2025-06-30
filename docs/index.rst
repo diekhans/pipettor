@@ -17,7 +17,7 @@ Contents:
    library
    contributing
    authors
-   history
+   changelog
 
 Indices and tables
 ==================

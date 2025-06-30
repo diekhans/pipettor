@@ -1,10 +1,10 @@
 .. :changelog:
 
-History
-=======
+Change Log
+==========
 
-1.2.0
-------------------
+1.2.0 (in progress)
+-------------------
 * Support DataReader reading from multiple processes.  This allows collecting stderr
   from all processes in a pipeline.
 * Can now override stderr in Popen.
