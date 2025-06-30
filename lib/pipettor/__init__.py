@@ -5,7 +5,7 @@ import shlex
 from pipettor.docstrings import doc_cmd_std_args, doc_open_other_args, doc_raises, doc_error_handling
 from pipettor.exceptions import PipettorException, ProcessException
 from pipettor.devices import DataReader, DataWriter, File
-from pipettor.processes import Pipeline, Popen, setDefaultLogger, getDefaultLogger, setDefaultLogLevel, getDefaultLogLevel, setDefaultLogging
+from pipettor.processes import LOGGER_NAME, Pipeline, Popen, setDefaultLogger, getDefaultLogger, setDefaultLogLevel, getDefaultLogLevel, setDefaultLogging
 
 __version__ = "1.2.0b1"
 

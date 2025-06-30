@@ -49,6 +49,9 @@ Process I/O Classes
 
 Logging Control
 ---------------
+
+.. autodata:: pipettor.processes.LOGGER_NAME
+
 .. autofunction:: pipettor.setDefaultLogging
 
 .. autofunction:: pipettor.setDefaultLogger

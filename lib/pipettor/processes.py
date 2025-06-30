@@ -20,13 +20,16 @@ from pipettor.exceptions import PipettorException
 from pipettor.exceptions import ProcessException
 from pipettor.exceptions import _warn_error_during_error_handling
 
-_defaultLogger = None
+#: Name of default logger for pipettor
+LOGGER_NAME = "pipettor"
+
+_defaultLogger = logging.getLogger(LOGGER_NAME)
 _defaultLogLevel = logging.DEBUG
 
 def setDefaultLogger(logger):
     """Set the default pipettor logger used in logging command and errors.
-    If None, there is no default logging.  The logger can be the name of
-    a logger or the logger itself.  Standard value is None"""
+    If None, removes default logging.  The logger can be the name of
+    a logger or the logger   Default logger is ``pipettor``"""
     global _defaultLogger
     _defaultLogger = logging.getLogger(logger) if isinstance(logger, str) else logger
 
@@ -59,6 +62,7 @@ def _getLoggerToUse(logger):
     elif isinstance(logger, str):
         return logging.getLogger(logger)
     else:
+        assert isinstance(logger, logging.Logger)
         return logger
 
 def _getLogLevelToUse(logLevel):
