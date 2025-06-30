@@ -26,6 +26,10 @@ extras_require = {
         "pytest-xdist>=3.6",
         "vulture>=2.1",
     ],
+    "test": [
+        "pytest>=5.3",
+        "pytest-xdist>=3.6",
+    ],
 }
 
 setuptools.setup(

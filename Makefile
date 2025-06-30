@@ -101,7 +101,7 @@ dist: clean
 # test install locally
 test-pip: dist
 	${envsetup}
-	${envact} && pip install --no-cache-dir dist/pipettor-${version}-py3-none-any.whl[dev]
+	${envact} && pip install --no-cache-dir dist/pipettor-${version}-py3-none-any.whl[test]
 	${envact} && ${PYTEST} tests
 
 dist_wheel = dist/pipettor-${version}-py3-none-any.whl
@@ -114,7 +114,7 @@ release-testpypi: dist
 # test release install from testpypi
 test-release-testpypi:
 	${envsetup}
-	${envact} && pip install --no-cache-dir --index-url=${testpypi_url} pipettor==${version}
+	${envact} && pip install --no-cache-dir --index-url=${testpypi_url} "pipettor[test]==${version}"
 	${envact} && ${PYTEST} tests
 
 release: dist
@@ -122,7 +122,7 @@ release: dist
 
 release-test:
 	${envsetup}
-	${envact} && pip install --no-cache-dir pipettor==${version}
+	${envact} && pip install --no-cache-dir "pipettor[test]==${version}"
 	${envact} && ${PYTEST} tests
 
 
