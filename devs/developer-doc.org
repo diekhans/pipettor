@@ -20,13 +20,14 @@ make test-all
     conda install tox
 ** test install from local dist:
 make test-pip
+** build and check docs:
+  make docs
+on Mac OS/X
+  make docs-open
 ** check test coverage:
 make coverage
-** build docs:
-  make docs
-or on Mac OS/X
-  make docs-open
 ** push to github
+** test on MacOS, other Linux dists
 ** rebuild master at readthedocs to check for errors
 
 * test pip with testpypi

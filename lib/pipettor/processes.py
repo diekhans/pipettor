@@ -496,7 +496,7 @@ class Pipeline(object):
 
 
 # extend documentation from common text
-Pipeline.__doc__ += doc_cmd_std_args
+Pipeline.__doc__ += '\n' + doc_cmd_std_args
 
 class Popen(Pipeline):
     """
@@ -695,5 +695,5 @@ class Popen(Pipeline):
 
 
 # extend documentation from common text
-Popen.__doc__ += (doc_open_mode_arg + doc_cmd_std_args + doc_open_other_args + doc_raises +
+Popen.__doc__ += ('\n' + doc_open_mode_arg + doc_cmd_std_args + doc_open_other_args + doc_raises +
                   "\n" + doc_error_handling)

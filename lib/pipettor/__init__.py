@@ -13,14 +13,12 @@ __version__ = "1.2.0"
 def run(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLevel=None):
     """
     Construct and run a process pipeline.
-
     """    # doc extended below after class creation
     Pipeline(cmds, stdin=stdin, stdout=stdout, stderr=stderr, logger=logger, logLevel=logLevel).wait()
 
 
 # extend documentation from common text
-run.__doc__ += doc_cmd_std_args
-
+run.__doc__ += '\n' + doc_cmd_std_args
 
 def runout(cmds, stdin=None, stderr=DataReader, binary=False, logger=None, logLevel=None,
            buffering=-1, encoding=None, errors=None, newline=None):
@@ -36,7 +34,7 @@ def runout(cmds, stdin=None, stderr=DataReader, binary=False, logger=None, logLe
 
 
 # extend documentation from common text
-runout.__doc__ += doc_cmd_std_args + doc_open_other_args + doc_raises + """
+runout.__doc__ += '\n' + doc_cmd_std_args + doc_open_other_args + doc_raises + """
 
 Use ``str.splitlines()`` to split the result into lines.
 
