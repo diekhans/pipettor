@@ -3,6 +3,10 @@
 Change Log
 ==========
 
+1.2.1 (2025-06-30)
+------------------
+* Patch release fix ReadTheDocs build.
+
 1.2.0 (2025-06-30)
 ------------------
 * Support DataReader reading from multiple processes.  This allows collecting stderr

@@ -41,8 +41,9 @@ make test-release-testpypi
 
 * Release process:
 ** do all of the above testing
+** make sure all is committed
 ** WARNING: may have to update git tag if any things fixed
-** update HISTORY.rst
+** check CHANGELOG.rst and readthedocs once more
 ** Do the git duty
 - git reset --hard
 - bumpversion [major|minor|patch]
