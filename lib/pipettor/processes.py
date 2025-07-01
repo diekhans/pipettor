@@ -96,7 +96,7 @@ class Process(object):
     start() must be called to run process
     """
 
-    def __init__(self, cmd, stdin=None, stdout=None, stderr=None):
+    def __init__(self, cmd, stdin=None, stdout=None, stderr=None, env=None):
         self.lock = RLock()
         self.cmd = tuple(cmd)
         # stdio and argument Dev association
@@ -105,6 +105,7 @@ class Process(object):
         if stderr == DataReader:
             stderr = DataReader(errors='backslashreplace')
         self.stderr = self._stdio_assoc(stderr, "w")
+        self.env = env
         self.popen = None
         self.pid = None
         self.returncode = None  # exit code, or -signal
@@ -151,7 +152,8 @@ class Process(object):
             self.popen = subprocess.Popen(self.cmd,
                                           stdin=self._get_child_stdio(self.stdin, 0),
                                           stdout=self._get_child_stdio(self.stdout, 1),
-                                          stderr=self._get_child_stdio(self.stderr, 2))
+                                          stderr=self._get_child_stdio(self.stderr, 2),
+                                          env=self.env)
         except Exception as ex:
             raise ProcessException(str(self)) from ex
         self.pid = self.popen.pid
@@ -245,11 +247,12 @@ class Pipeline(object):
     """   # doc extended below after class creation
 
     def __init__(self, cmds, *, stdin=None, stdout=None, stderr=DataReader,
-                 logger=None, logLevel=None):
+                 env=None, logger=None, logLevel=None):
         self.lock = RLock()
         self.stdin = stdin
         self.stdout = stdout
         self.stderr = stderr
+        self.env = env
         self.procs = []
         self.devs = set()
         self.bypid = dict()    # indexed by pid
@@ -296,17 +299,17 @@ class Pipeline(object):
         prevPipe = None
         lastCmdIdx = len(cmds) - 1
         for i in range(len(cmds)):
-            prevPipe = self._add_process(cmds[i], prevPipe, (i == lastCmdIdx), self.stdin, self.stdout, self.stderr)
+            prevPipe = self._add_process(cmds[i], prevPipe, (i == lastCmdIdx), self.stderr)
 
-    def _add_process(self, cmd, prevPipe, isLastCmd, stdinFirst, stdoutLast, stderr):
+    def _add_process(self, cmd, prevPipe, isLastCmd, stderr):
         """add one process to the pipeline, return the output pipe if not the last process"""
         if prevPipe is None:
-            stdin = stdinFirst  # first process in pipeline
+            stdin = self.stdin  # first process in pipeline
         else:
             stdin = prevPipe
         if isLastCmd:
             outPipe = None
-            stdout = stdoutLast  # last process in pipeline
+            stdout = self.stdout  # last process in pipeline
         else:
             outPipe = stdout = _SiblingPipe()
         try:
@@ -319,7 +322,7 @@ class Pipeline(object):
 
     def _create_process(self, cmd, stdin, stdout, stderr):
         """create process and track Dev objects"""
-        proc = Process(cmd, stdin, stdout, stderr)
+        proc = Process(cmd, stdin, stdout, stderr, self.env)
         self.procs.append(proc)
         # Proc maybe have wrapped a Dev
         for std in (proc.stdin, proc.stdout, proc.stderr):
@@ -516,7 +519,7 @@ class Popen(Pipeline):
     # due to it doing both binary and text I/O.  Probably could do this with
     # some kind of dynamic base class setting.
 
-    def __init__(self, cmds, mode='r', *, stdin=None, stdout=None, stderr=None, logger=None, logLevel=None,
+    def __init__(self, cmds, mode='r', *, stdin=None, stdout=None, stderr=None, env=None, logger=None, logLevel=None,
                  buffering=-1, encoding=None, errors=None, newline=None):
         self.mode = mode
         self._pipeline_fh = None
@@ -543,7 +546,8 @@ class Popen(Pipeline):
             self._child_fd = pipe_read_fd
             self._pipeline_fh = open(pipe_write_fd, mode, buffering=buffering,
                                      encoding=encoding, errors=errors, newline=newline)
-        super().__init__(cmds, stdin=firstIn, stdout=lastOut, stderr=stderr, logger=logger, logLevel=logLevel)
+        super().__init__(cmds, stdin=firstIn, stdout=lastOut, stderr=stderr, env=env,
+                         logger=logger, logLevel=logLevel)
         self.start()
         os.close(self._child_fd)
         self._child_fd = None

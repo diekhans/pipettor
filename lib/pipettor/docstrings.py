@@ -19,6 +19,8 @@ doc_cmd_std_args = """\
     filename, file-like object, file descriptor, a :class:`pipettor.File`
     object, or a :class:`pipettor.DataReader` object. It may also be the
     class :class:`pipettor.DataReader` itself.  See discussion below.
+:param env: mapping that defines environment for process.  If None, the
+    current environment is inherited.
 :param logger: Name of the logger or a `Logger` instance. If ``None``,
     the default ``pipettor`` logger is used.
 :param logLevel: Log level to use instead of the default.

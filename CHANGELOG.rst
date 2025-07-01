@@ -3,6 +3,10 @@
 Change Log
 ==========
 
+1.3.1 (in progress)
+-------------------
+* Support for passing environment to processes.
+
 1.2.1 (2025-06-30)
 ------------------
 * Patch release fix ReadTheDocs build.

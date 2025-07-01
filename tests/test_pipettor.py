@@ -486,6 +486,16 @@ class PopenTests(PipettorTestBase):
         self.assertEqual(['Microtubules are assembled from dimers of a- and \xc3\x9f-tubulin.'], lines)
         self.orphanChecks(nopen)
 
+    def testEnvPassing(self):
+        env = dict(os.environ)
+        env['PIPETTOR'] = "YES"
+
+        got_it = False
+        with Popen(["env"], env=env) as fh:
+            for line in fh:
+                if line.strip() == "PIPETTOR=YES":
+                    got_it = True
+        assert got_it, "PIPETTOR=YES not set in enviroment"
 
 class FunctionTests(PipettorTestBase):
     def __init__(self, methodName):
@@ -545,6 +555,13 @@ class FunctionTests(PipettorTestBase):
         out = runlexout("sort -r", stdin=inf)
         self.assertEqual(out, "two\nthree\nsix\none\nfour\nfive\n")
         self.orphanChecks(nopen)
+
+    def testEnvPassing(self):
+        env = dict(os.environ)
+        env['PIPETTOR'] = "YES"
+
+        lines = runout(["env"], env=env).splitlines()
+        assert "PIPETTOR=YES" in lines
 
 
 def suite():

@@ -10,17 +10,17 @@ from pipettor.processes import Pipeline, Popen, setDefaultLogger, getDefaultLogg
 
 __version__ = "1.2.1"
 
-def run(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLevel=None):
+def run(cmds, stdin=None, stdout=None, stderr=DataReader, env=None, logger=None, logLevel=None):
     """
     Construct and run a process pipeline.
     """    # doc extended below after class creation
-    Pipeline(cmds, stdin=stdin, stdout=stdout, stderr=stderr, logger=logger, logLevel=logLevel).wait()
+    Pipeline(cmds, stdin=stdin, stdout=stdout, stderr=stderr, env=env, logger=logger, logLevel=logLevel).wait()
 
 
 # extend documentation from common text
 run.__doc__ += '\n' + doc_cmd_std_args
 
-def runout(cmds, stdin=None, stderr=DataReader, binary=False, logger=None, logLevel=None,
+def runout(cmds, stdin=None, stderr=DataReader, env=None, binary=False, logger=None, logLevel=None,
            buffering=-1, encoding=None, errors=None, newline=None):
     """
     Construct and run a process pipeline, returning the output.
@@ -28,7 +28,7 @@ def runout(cmds, stdin=None, stderr=DataReader, binary=False, logger=None, logLe
     """    # doc extended below after class creation
     dr = DataReader(binary=binary, buffering=buffering,
                     encoding=encoding, errors=errors, newline=newline)
-    Pipeline(cmds, stdin=stdin, stdout=dr, stderr=stderr,
+    Pipeline(cmds, stdin=stdin, stdout=dr, stderr=stderr, env=env,
              logger=logger, logLevel=logLevel).wait()
     return dr.data
 
@@ -49,23 +49,23 @@ def _lexcmds(cmds):
                 for cmd in cmds]
 
 
-def runlex(cmds, stdin=None, stdout=None, stderr=DataReader, logger=None, logLevel=None):
+def runlex(cmds, stdin=None, stdout=None, stderr=DataReader, env=None, logger=None, logLevel=None):
     """Call :func:`pipettor.run`, first splitting commands specified as strings
     are split into arguments using `shlex.split`.
 
     See :func:`run` for details.
     """
-    run(_lexcmds(cmds), stdin=stdin, stdout=stdout, stderr=stderr, logger=logger, logLevel=None)
+    run(_lexcmds(cmds), stdin=stdin, stdout=stdout, stderr=stderr, env=env, logger=logger, logLevel=None)
 
 
-def runlexout(cmds, stdin=None, stderr=DataReader, logger=None, logLevel=None,
+def runlexout(cmds, stdin=None, stderr=DataReader, env=None, logger=None, logLevel=None,
               buffering=-1, encoding=None, errors=None):
     """Call :func:`pipettor.runout`, first splitting commands specified
     as strings are split into arguments using `shlex.split`.
 
     See :func:`runout` for details.
     """
-    return runout(_lexcmds(cmds), stdin=stdin, stderr=stderr, logger=logger, logLevel=logLevel,
+    return runout(_lexcmds(cmds), stdin=stdin, stderr=stderr, env=env, logger=logger, logLevel=logLevel,
                   buffering=buffering, encoding=encoding, errors=errors)
 
 
