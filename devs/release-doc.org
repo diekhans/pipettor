@@ -60,8 +60,26 @@ might have to wait a minute for it to become live
 
 * CondaForge
 
-** staging
+** just wait, you will get merge request from regro-cf-autotick-bot
+review and approve the merge
+
+** doing in manually
+*** setup
+git clone git@github.com:diekhans/pipettor-feedstock.git
+cd pipettor-feedstock.git
+
+*** conda tools
 conda create --name pipettor-conda
-conda install -c conda-forge grayskull
-git checkout -b pipettor
-grayskull pypi --strict-conda-forge pipettor
+conda activate pipettor-conda
+conda install -c conda-forge conda-smithy conda-forge-pinning conda-build
+
+*** update
+edit recipe/meta.yaml
+using pypi to get sha256
+
+*** check
+conda build recipe
+conda smithy rerender -c auto
+
+*** make pull request
+
