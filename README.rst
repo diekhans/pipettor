@@ -12,6 +12,7 @@ Features
   command represented as a sequence of arguments.
 * Failure of any process in the pipeline results in an exception, with ``stderr``
   included in the exception.
+* Command line is include in error message.
 * Pipeline ``stdin/stdout/stderr`` can be passed through from parent process,
   redirected to a file, or read/written by the parent process.
 * Asynchronous reading and writing to and from the pipeline maybe done without risk of
