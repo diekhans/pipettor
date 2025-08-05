@@ -69,6 +69,15 @@ def _getLogLevelToUse(logLevel):
     "get log level to use, either what is specified or default"
     return logLevel if logLevel is not None else getDefaultLogLevel()
 
+def _log_msg(logger, level, message, source, ex=None):
+    """If logging is available and enabled, log message and optional
+    exception. str(source) is included in the message"""
+    if (logger is not None) and logger.isEnabledFor(level):
+        kwargs = {}
+        if ex is not None:
+            kwargs["exc_info"] = ex
+        logger.log(level, "{}: {}".format(message, str(source)), **kwargs)
+
 class State(enum.IntEnum):
     """Current state of a process"""
     PREINIT = 0
@@ -96,9 +105,10 @@ class Process(object):
     start() must be called to run process
     """
 
-    def __init__(self, cmd, stdin=None, stdout=None, stderr=None, env=None):
+    def __init__(self, cmd, logger, stdin=None, stdout=None, stderr=None, env=None):
         self.lock = RLock()
         self.cmd = tuple(cmd)
+        self.logger = logger
         # stdio and argument Dev association
         self.stdin = self._stdio_assoc(stdin, "r")
         self.stdout = self._stdio_assoc(stdout, "w")
@@ -193,6 +203,7 @@ class Process(object):
         # don't save exception if we force it to be killed
         if not self.forced:
             self.procExcept = ProcessException(str(self), self.returncode, stderr)
+            _log_msg(self.logger, logging.DEBUG, "process failed", self, self.procExcept)
 
     def _handle_exit(self, waitStat):
         """Handle process exiting, saving status  """
@@ -289,11 +300,10 @@ class Pipeline(object):
     def _log(self, level, message, ex=None):
         """If logging is available and enabled, log message and optional
         exception"""
-        if (self.logger is not None) and (self.logger.isEnabledFor(level)):
-            kwargs = {}
-            if ex is not None:
-                kwargs["exc_info"] = ex
-            self.logger.log(level, "{}: {}".format(message, str(self)), **kwargs)
+        _log_msg(self.logger, level, message, self, ex)
+
+    def _log_failure(self, ex):
+        self._log(logging.ERROR, "failure", ex)
 
     def _setup_processes(self, cmds):
         prevPipe = None
@@ -322,7 +332,7 @@ class Pipeline(object):
 
     def _create_process(self, cmd, stdin, stdout, stderr):
         """create process and track Dev objects"""
-        proc = Process(cmd, stdin, stdout, stderr, self.env)
+        proc = Process(cmd, self.logger, stdin, stdout, stderr, self.env)
         self.procs.append(proc)
         # Proc maybe have wrapped a Dev
         for std in (proc.stdin, proc.stdout, proc.stderr):
@@ -363,9 +373,6 @@ class Pipeline(object):
         for d in self.devs:
             d.close()
         self._log(self.logLevel, "success")
-
-    def _log_failure(self, ex):
-        self._log(logging.ERROR, "failure", ex)
 
     def _error_cleanup_dev(self, dev):
         try:
@@ -664,10 +671,11 @@ class Popen(Pipeline):
 
     def __iter__(self):
         "iter over contents of file"
-        return self._pipeline_fh.__iter__()
-
-    def __next__(self):
-        return next(self._pipeline_fh)
+        yield from self._pipeline_fh
+        # reached the end, now close.  This will result
+        # in better errors with "for line in Popen(...)"
+        # idiom.
+        self.close()
 
     def write(self, str):
         "Write string str to file."

@@ -388,7 +388,7 @@ class PopenTests(PipettorTestBase):
         pl.close()
         self.commonChecks(nopen, pl, "gzip -1 <.+ >.*output/test_pipettor.PopenTests.testWrite.out.gz", isRe=True)
 
-        # macOS Ventura: don't used zcat; would need to use gzcat, but this is compatbile with all
+        # macOS Ventura: user gunzip rather than zcat, as zcat did not support .gz
         Pipeline(("gunzip", "-c", outfGz), stdout=outf).wait()
         self.diffExpected(".out")
 
@@ -434,6 +434,23 @@ class PopenTests(PipettorTestBase):
 
         self.diffExpected(".out")
         self.commonChecks(nopen, pl, "^gzip -dc <.*output/test_pipettor.PopenTests.testRead.txt.gz >.+$", isRe=True)
+
+    def testReadFor(self):
+        inf = self.getInputFile("simple1.txt")
+        infGz = self.getOutputFile(".txt.gz")
+        Pipeline(("gzip", "-c", inf), stdout=infGz).wait()
+
+        outf = self.getOutputFile(".out")
+        with open(outf, "w") as outfh:
+            for line in Popen(("zcat", infGz)):
+                outfh.write(line)
+        self.diffExpected(".out")
+
+    def testReadForError(self):
+        # error in for loop read
+        with self.assertRaisesRegex(ProcessException, "^process exited 1: zcat /does/not/exist$"):
+            for line in Popen(("zcat", "/does/not/exist")):
+                pass
 
     def testReadMult(self):
         nopen = self.numOpenFiles()

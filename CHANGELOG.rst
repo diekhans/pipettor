@@ -6,6 +6,7 @@ Change Log
 1.3.0 (in progress)
 -------------------
 * Support for passing environment to processes.
+* Fixed 'for line in Popen(...)' idiom always generating error do to premature close.
 
 1.2.1 (2025-06-30)
 ------------------
