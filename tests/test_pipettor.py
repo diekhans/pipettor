@@ -1,593 +1,551 @@
 # -*- coding: utf-8 -*-
 # Copyright 2006-2025 Mark Diekhans
-import unittest
+import pytest
 import sys
 import os
+import os.path as osp
 import re
-import signal
-import tracemalloc
 from pathlib import Path
 
-if __name__ == '__main__':
-    sys.path.insert(0, os.path.normpath(os.path.dirname(sys.argv[0])) + "/../lib")
-    from testCaseBase import TestCaseBase, LoggerForTests
-else:
-    from .testCaseBase import TestCaseBase, LoggerForTests
+sys.path = [osp.normpath(osp.dirname(__file__) + "/../lib"),
+            osp.normpath(osp.dirname(__file__))] + sys.path
+
+import testing_support as ts
 from pipettor import Pipeline, Popen, ProcessException, PipettorException, DataReader, DataWriter, File, run, runout, runlex, runlexout
 
+def _get_prog_with_error_cmd(request, *args):
+    return (os.path.join(ts.get_test_dir(request), "progWithError"),) + args
 
-def sigquit_handler(signum, frame):
-    " prevent MacOS  crash reporter"
-    sys.exit(os.EX_SOFTWARE)
+def orphan_checks(nopen):
+    "check for orphaned child process, open files or threads"
+    ts.assert_no_child_procs()
+    ts.assert_num_open_files_same(nopen)
+    ts.assert_single_thread()
 
-
-signal.signal(signal.SIGQUIT, sigquit_handler)
-
-# this keeps OS/X crash reporter from popping up on unittest error
-signal.signal(signal.SIGQUIT,
-              lambda signum, frame: sys.exit(os.EX_SOFTWARE))
-signal.signal(signal.SIGABRT,
-              lambda signum, frame: sys.exit(os.EX_SOFTWARE))
-
-def setup_module(module):
-    tracemalloc.start()
-
-def _getProgWithErrorCmd(test, *args):
-    return (os.path.join(test.getTestDir(), "progWithError"),) + args
-
-class PipettorTestBase(TestCaseBase):
-    "provide common functions used in test classes"
-    def __init__(self, methodName):
-        super(PipettorTestBase, self).__init__(methodName)
-
-    def orphanChecks(self, nopen):
-        "check for orphaned child process, open files or threads"
-        self.assertNoChildProcs()
-        self.assertNumOpenFilesSame(nopen)
-        self.assertSingleThread()
-
-    def commonChecks(self, nopen, pipeline, expectStr, isRe=False):
-        """check that files, threads, and processes have not leaked. Check str(pipeline)
-        against expectStr, which can be a string, or an regular expression if
-        isRe==True, or None to not check."""
-        s = str(pipeline)
-        if expectStr is not None:
-            if isRe:
-                if not re.search(expectStr, s):
-                    self.fail("'" + s + "' doesn't match RE '" + expectStr + "'")
-            else:
-                self.assertEqual(s, expectStr)
-        self.orphanChecks(nopen)
-
-    def _checkProgWithError(self, procExcept, progArgs=None):
-        expectReTmpl = "^process exited 1: .+/progWithError{}{}:\nTHIS GOES TO STDERR{}{}.*$"
-        if progArgs is not None:
-            expectRe = expectReTmpl.format(" ", progArgs, ": ", progArgs)
+def common_checks(nopen, pipeline, expect_str, is_re=False):
+    """check that files, threads, and processes have not leaked. Check str(pipeline)
+    against expectStr, which can be a string, or an regular expression if
+    is_re==True, or None to not check."""
+    s = str(pipeline)
+    if expect_str is not None:
+        if is_re:
+            if not re.search(expect_str, s):
+                pytest.fail(f"'{s}' doesn't match RE '{expect_str}'")
         else:
-            expectRe = expectReTmpl.format("", "", "", "")
-        if not re.match(expectRe, str(procExcept), re.MULTILINE):
-            self.fail("'{}' does not match '{}'".format(str(procExcept), str(expectRe)))
+            assert s == expect_str
+    orphan_checks(nopen)
 
+def check_prog_with_error(proc_except, prog_args=None):
+    expect_re_tmpl = "^process exited 1: .+/progWithError{}{}:\nTHIS GOES TO STDERR{}{}.*$"
+    if prog_args is not None:
+        expect_re = expect_re_tmpl.format(" ", prog_args, ": ", prog_args)
+    else:
+        expect_re = expect_re_tmpl.format("", "", "", "")
+    if not re.match(expect_re, str(proc_except), re.MULTILINE):
+        pytest.fail(f"'{proc_except}' does not match '{expect_re}'")
 
-class PipelineTests(PipettorTestBase):
-    def __init__(self, methodName):
-        super(PipelineTests, self).__init__(methodName)
+###
+# Pipeline tests
+###
 
-    def testTrivial(self):
-        nopen = self.numOpenFiles()
-        pl = Pipeline(("true",))
+def test_trivial():
+    nopen = ts.get_num_open_files()
+    pl = Pipeline(("true",))
+    pl.wait()
+    common_checks(nopen, pl, "true 2>[DataReader]")
+
+def test_trivial_poll():
+    nopen = ts.get_num_open_files()
+    pl = Pipeline(("sleep", "1"))
+    while not pl.poll():
+        pass
+    pl.wait()
+    common_checks(nopen, pl, "sleep 1 2>[DataReader]")
+
+def test_trivial_fail_poll():
+    nopen = ts.get_num_open_files()
+    pl = Pipeline([("sleep", "1"), ("false",)])
+    with pytest.raises(ProcessException, match="^process exited 1: sleep 1 | false$"):
         pl.wait()
-        self.commonChecks(nopen, pl, "true 2>[DataReader]")
+    common_checks(nopen, pl, "sleep 1 | false 2>[DataReader]")
 
-    def testTrivialPoll(self):
-        nopen = self.numOpenFiles()
-        pl = Pipeline(("sleep", "1"))
-        while not pl.poll():
+def test_trivial_status():
+    nopen = ts.get_num_open_files()
+    pl = Pipeline(("true",))
+    pl.start()
+    assert pl.running
+    assert not pl.finished
+    pl.wait()
+    assert not pl.running
+    assert pl.finished
+    common_checks(nopen, pl, "true 2>[DataReader]")
+
+def test_simple_pipe():
+    nopen = ts.get_num_open_files()
+    log = ts.LoggerForTests()
+    pl = Pipeline([("true",), ("true",)], logger=log.logger)
+    pl.wait()
+    common_checks(nopen, pl, "true | true 2>[DataReader]")
+    assert log.data == ("""start: true | true 2>[DataReader]\n"""
+                        """success: true | true 2>[DataReader]\n""")
+
+def test_simple_pipe_fail():
+    nopen = ts.get_num_open_files()
+    log = ts.LoggerForTests()
+    pl = Pipeline([("false",), ("true",)], logger=log.logger)
+    with pytest.raises(ProcessException, match="^process exited 1: false$"):
+        pl.wait()
+    common_checks(nopen, pl, "false | true 2>[DataReader]")
+    assert re.search("""^start: false | true 2>[DataReader]\n"""
+                     """failure: false | true 2>[DataReader]: process exited 1: false\n.*""",
+                     log.data, re.MULTILINE)
+
+def test_path_obj():
+    nopen = ts.get_num_open_files()
+    log = ts.LoggerForTests()
+    true_path = Path("/usr/bin/true")
+    pl = Pipeline([(true_path,), (true_path,)], logger=log.logger)
+    pl.wait()
+    common_checks(nopen, pl, "/usr/bin/true | /usr/bin/true 2>[DataReader]")
+    assert log.data == ("""start: /usr/bin/true | /usr/bin/true 2>[DataReader]\n"""
+                        """success: /usr/bin/true | /usr/bin/true 2>[DataReader]\n""")
+
+def test_pipe_fail_stderr(request):
+    nopen = ts.get_num_open_files()
+    # should report first failure
+    pl = Pipeline([("true",), _get_prog_with_error_cmd(request), ("false",)], stderr=DataReader)
+    with pytest.raises(ProcessException) as cm:
+        pl.wait()
+    check_prog_with_error(cm.value)
+    orphan_checks(nopen)
+
+def test_pipe_fail3_stderr(request):
+    # all 3 process fail
+    nopen = ts.get_num_open_files()
+    # should report first failure
+    pl = Pipeline([_get_prog_with_error_cmd(request, "process0"),
+                   _get_prog_with_error_cmd(request, "process1"),
+                   _get_prog_with_error_cmd(request, "process2")],
+                  stderr=DataReader)
+    with pytest.raises(ProcessException) as cm:
+        pl.wait()
+    # should be first process
+    check_prog_with_error(cm.value, "process0")
+    # check process
+    for i in range(3):
+        check_prog_with_error(pl.procs[i].procExcept, "process{}".format(i))
+    orphan_checks(nopen)
+
+def test_exec_fail():
+    # invalid executable
+    nopen = ts.get_num_open_files()
+    dw = DataWriter("one\ntwo\nthree\n")
+    pl = Pipeline(("procDoesNotExist", "-r"), stdin=dw)
+    with pytest.raises(ProcessException) as cm:
+        pl.wait()
+    assert re.search("exec failed: procDoesNotExist -r.*", str(cm.value))
+    assert cm.value.__cause__ is not None
+    assert re.search("\\[Errno 2\\] No such file or directory: 'procDoesNotExist'.*",
+                     str(cm.value.__cause__))
+    common_checks(nopen, pl, "procDoesNotExist -r <[DataWriter] 2>[DataReader]")
+
+def test_signaled():
+    # process signals
+    nopen = ts.get_num_open_files()
+    pl = Pipeline(("sh", "-c", "kill -11 $$"))
+    with pytest.raises(ProcessException) as cm:
+        pl.wait()
+    expect = "process signaled: SIGSEGV: sh -c 'kill -11 $$'"
+    msg = str(cm.value)
+    if not msg.startswith(expect):
+        pytest.fail(f"'{msg}' does not start with '{expect}', cause: " + str(getattr(cm.value, "cause", None)))
+    common_checks(nopen, pl, "sh -c 'kill -11 $$' 2>[DataReader]")
+
+def test_stdin_mem(request):
+    # write from memory to stdin
+    nopen = ts.get_num_open_files()
+    outf = ts.get_test_output_file(request, ".out")
+    dw = DataWriter("one\ntwo\nthree\n")
+    pl = Pipeline(("sort", "-r"), stdin=dw, stdout=outf)
+    pl.wait()
+    ts.diff_results_expected(request, ".out")
+    common_checks(nopen, pl, "^sort -r <\\[DataWriter\\] >.+/output/test_pipettor.py::test_stdin_mem\\.out 2>\\[DataReader\\]$", is_re=True)
+
+def test_stdout_mem(request):
+    # read from stdout into memory
+    nopen = ts.get_num_open_files()
+    inf = ts.get_test_input_file(request, "simple1.txt")
+    dr = DataReader()
+    pl = Pipeline(("sort", "-r"), stdin=inf, stdout=dr)
+    pl.wait()
+    assert dr.data == "two\nthree\nsix\none\nfour\nfive\n"
+    common_checks(nopen, pl, "^sort -r <.+/input/simple1\\.txt >\\[DataReader\\]", is_re=True)
+
+def test_stdin_stdout_mem():
+    # write and read from memory
+    nopen = ts.get_num_open_files()
+    dw = DataWriter("one\ntwo\nthree\n")
+    dr = DataReader()
+    pl = Pipeline([("cat", "-u"), ("cat", "-u")], stdin=dw, stdout=dr)
+    pl.wait()
+    assert dr.data == "one\ntwo\nthree\n"
+    common_checks(nopen, pl, "^cat -u <\\[DataWriter\\] \\| cat -u >\\[DataReader\\] 2>\\[DataReader\\]$", is_re=True)
+
+def test_file_mode():
+    with pytest.raises(PipettorException, match="^invalid or unsupported mode 'q' opening /dev/null"):
+        File("/dev/null", "q")
+
+def test_collect_stdout_err():
+    # independent collection of stdout and stderr
+    nopen = ts.get_num_open_files()
+    stdoutRd = DataReader()
+    stderrRd = DataReader()
+    pl = Pipeline(("sh", "-c", "echo this goes to stdout; echo this goes to stderr >&2"),
+                  stdout=stdoutRd, stderr=stderrRd)
+    pl.wait()
+    assert stdoutRd.data == "this goes to stdout\n"
+    assert stderrRd.data == "this goes to stderr\n"
+    common_checks(nopen, pl, "sh -c 'echo this goes to stdout; echo this goes to stderr >&2' >[DataReader] 2>[DataReader]")
+
+def test_stdin_mem_binary(request):
+    # binary write from memory to stdin
+    nopen = ts.get_num_open_files()
+    outf = ts.get_test_output_file(request, ".out")
+    fh = open(ts.get_test_input_file(request, "file.binary"), "rb")
+    dw = DataWriter(fh.read())
+    fh.close()
+    pl = Pipeline(("cat",), stdin=dw, stdout=outf)
+    pl.wait()
+    ts.diff_results_binary_expected(request, ".out", expect_basename="file.binary")
+    common_checks(nopen, pl, "^cat <\\[DataWriter] >.*/output/test_pipettor.py::test_stdin_mem_binary.out 2>\\[DataReader\\]$", is_re=True)
+
+def test_stdout_mem_binary(request):
+    # binary read from stdout into memory
+    nopen = ts.get_num_open_files()
+    inf = ts.get_test_input_file(request, "file.binary")
+    dr = DataReader(binary=True)
+    pl = Pipeline(("cat",), stdin=inf, stdout=dr)
+    pl.wait()
+    fh = open(ts.get_test_output_file(request, ".out"), "wb")
+    fh.write(dr.data)
+    fh.close()
+    ts.diff_results_binary_expected(request, ".out", expect_basename="file.binary")
+    common_checks(nopen, pl, "^cat <.*/input/file.binary >\\[DataReader] 2>\\[DataReader\\]$", is_re=True)
+
+def test_write_file(request):
+    # test write to File object
+    nopen = ts.get_num_open_files()
+    inf = ts.get_test_input_file(request, "simple1.txt")
+    outf = ts.get_test_output_file(request, ".out")
+    # double cat actually found a bug
+    pl = Pipeline([("cat",), ("cat",)], stdin=inf, stdout=File(outf, "w"))
+    pl.wait()
+    ts.diff_results_expected(request, ".out")
+    common_checks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/test_pipettor.py::test_write_file.out 2>\\[DataReader\\]$", is_re=True)
+
+def test_read_file(request):
+    # test read and write to File object
+    nopen = ts.get_num_open_files()
+    inf = ts.get_test_input_file(request, "simple1.txt")
+    outf = ts.get_test_output_file(request, ".out")
+    pl = Pipeline([("cat",), ("cat",)], stdin=File(inf), stdout=File(outf, "w"))
+    pl.wait()
+    ts.diff_results_expected(request, ".out")
+    common_checks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/test_pipettor.py::test_read_file.out 2>\\[DataReader\\]$", is_re=True)
+
+def test_append_file(request):
+    # test append to File object
+    nopen = ts.get_num_open_files()
+    inf = ts.get_test_input_file(request, "simple1.txt")
+    outf = ts.get_test_output_file(request, ".out")
+    # double cat actually found a bug
+    pl = Pipeline([("cat",), ("cat",)], stdin=inf, stdout=File(outf, "w"), stderr=None)
+    pl.wait()
+    pl = Pipeline([("cat",), ("cat",)], stdin=inf, stdout=File(outf, "a"), stderr=None)
+    pl.wait()
+    ts.diff_results_expected(request, ".out")
+    common_checks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/test_pipettor.py::test_append_file.out$", is_re=True)
+
+_bogus_stdio_expect_re = "^invalid stdio specification object type: <class 'float'> 3\\.14159$"
+
+def test_bogus_stdin(request):
+    # test stdin specification is not legal
+    nopen = ts.get_num_open_files()
+    with pytest.raises(PipettorException, match=_bogus_stdio_expect_re):
+        pl = Pipeline([("date",), ("date",)], stdin=3.14159)
+        pl.wait()
+    orphan_checks(nopen)
+
+def test_bogus_stdout():
+    # test stdout specification is not legal
+    nopen = ts.get_num_open_files()
+    with pytest.raises(PipettorException, match=_bogus_stdio_expect_re):
+        pl = Pipeline([("date",), ("date",)], stdout=3.14159)
+        pl.wait()
+    orphan_checks(nopen)
+
+def test_bogus_stderr():
+    # test stderr specification is not legal
+    nopen = ts.get_num_open_files()
+    with pytest.raises(PipettorException, match=_bogus_stdio_expect_re):
+        pl = Pipeline([("date",), ("date",)], stderr=3.14159)
+        pl.wait()
+    orphan_checks(nopen)
+
+def test_data_reader_share():
+    # test stderr linked to stdout/stderr
+    nopen = ts.get_num_open_files()
+    dr = DataReader()
+    pl = Pipeline([("date",), ("date",)], stdout=dr, stderr=dr)
+    pl.wait()
+    orphan_checks(nopen)
+
+def test_data_writer_bogus_share():
+    # test stderr specification is not legal
+    nopen = ts.get_num_open_files()
+    dw = DataWriter("fred")
+    with pytest.raises(PipettorException, match="^DataWriter already bound to a process$"):
+        pl1 = Pipeline([("cat", "/dev/null"), ("cat", "/dev/null")], stdin=dw)
+        Pipeline([("cat", "/dev/null"), ("cat", "/dev/null")], stdin=dw)
+    pl1.shutdown()  # clean up unstarted process
+    orphan_checks(nopen)
+
+def test_int_arg(request):
+    nopen = ts.get_num_open_files()
+    inf = ts.get_test_input_file(request, "simple1.txt")
+    dr = DataReader()
+    pl = Pipeline(("head", -2), stdin=inf, stdout=dr)
+    pl.wait()
+    assert dr.data == "one\ntwo\n"
+    common_checks(nopen, pl, "^head -2 <.+/input/simple1\\.txt >\\[DataReader\\]", is_re=True)
+
+def test_stderr_pipe_redir():
+    # stderr DataReader on multiple processes
+    stderr = DataReader(errors='backslashreplace')
+    cmds = (["sh", "-c", "echo command one >&2"],
+            ["sh", "-c", "echo COMMAND TWO >&2"])
+    pl = Pipeline(cmds, stdout='/dev/null', stderr=stderr)
+    pl.wait()
+    # can't predict order
+    err_sorted = list(sorted(stderr.data.strip().split('\n')))
+    assert err_sorted == ['COMMAND TWO', 'command one']
+
+###
+# Popen tests
+###
+
+def cp_file_to_pl(request, in_name, pl):
+    inf = ts.get_test_input_file(request, in_name)
+    fh = open(inf)
+    for line in fh:
+        pl.write(line)
+    fh.close()
+
+def cp_pl_to_file(request, pl, out_ext):
+    outf = ts.get_test_output_file(request, out_ext)
+    fh = open(outf, "w")
+    for line in pl:
+        fh.write(line)
+    fh.close()
+
+def test_popen_write(request):
+    nopen = ts.get_num_open_files()
+    outf = ts.get_test_output_file(request, ".out")
+    outfGz = ts.get_test_output_file(request, ".out.gz")
+
+    pl = Popen(("gzip", "-1"), "w", stdout=outfGz)
+    cp_file_to_pl(request, "simple1.txt", pl)
+    pl.close()
+    common_checks(nopen, pl, "gzip -1 <.+ >.*output/test_pipettor.py::test_popen_write.out.gz", is_re=True)
+
+    # macOS Ventura: user gunzip rather than zcat, as zcat did not support .gz
+    Pipeline(("gunzip", "-c", outfGz), stdout=outf).wait()
+    ts.diff_results_expected(request, ".out")
+
+def test_popen_write_file(request):
+    nopen = ts.get_num_open_files()
+    outf = ts.get_test_output_file(request, ".out")
+    outfGz = ts.get_test_output_file(request, ".out.gz")
+
+    with open(outfGz, "w") as outfGzFh:
+        pl = Popen(("gzip", "-1"), "w", stdout=outfGzFh)
+        cp_file_to_pl(request, "simple1.txt", pl)
+        pl.wait()
+
+    # macOS Ventura: don't used zcat; would need to use gzcat, but this is compatbile with all
+    Pipeline(("gunzip", "-c", outfGz), stdout=outf).wait()
+    ts.diff_results_expected(request, ".out")
+    common_checks(nopen, pl, "gzip -1 <.* >.*output/test_pipettor.py::test_popen_write_file.out.gz", is_re=True)
+
+def test_popen_write_mult(request):
+    nopen = ts.get_num_open_files()
+    outf = ts.get_test_output_file(request, ".wc")
+
+    # grr, BSD wc adds an extract space, so just convert to tabs
+    pl = Popen((("gzip", "-1"),
+                ("gzip", "-dc"),
+                ("wc",),
+                ("sed", "-e", "s/  */\t/g")), "w", stdout=outf)
+    cp_file_to_pl(request, "simple1.txt", pl)
+    pl.wait()
+
+    ts.diff_results_expected(request, ".wc")
+    common_checks(nopen, pl, "^gzip -1 <.+ | gzip -dc | wc | sed -e 's/  \\*/	/g' >.*output/test_pipettor::.test_popen_write_mult.wc$", is_re=True)
+
+def test_popen_read(request):
+    nopen = ts.get_num_open_files()
+    inf = ts.get_test_input_file(request, "simple1.txt")
+    infGz = ts.get_test_output_file(request, ".txt.gz")
+    Pipeline(("gzip", "-c", inf), stdout=infGz).wait()
+
+    pl = Popen(("gzip", "-dc"), "r", stdin=infGz)
+    cp_pl_to_file(request, pl, ".out")
+    pl.wait()
+
+    ts.diff_results_expected(request, ".out")
+    common_checks(nopen, pl, "^gzip -dc <.*output/test_pipettor.py::test_popen_read.txt.gz >.+$", is_re=True)
+
+def test_popen_read_for(request):
+    inf = ts.get_test_input_file(request, "simple1.txt")
+    infGz = ts.get_test_output_file(request, ".txt.gz")
+    Pipeline(("gzip", "-c", inf), stdout=infGz).wait()
+
+    outf = ts.get_test_output_file(request, ".out")
+    with open(outf, "w") as outfh:
+        for line in Popen(("zcat", infGz)):
+            outfh.write(line)
+    ts.diff_results_expected(request, ".out")
+
+def test_popen_read_for_error():
+    # error in for loop read
+    with pytest.raises(ProcessException, match="^process exited 1: zcat /does/not/exist$"):
+        for line in Popen(("zcat", "/does/not/exist")):
             pass
+
+def test_popen_read_mult(request):
+    nopen = ts.get_num_open_files()
+    inf = ts.get_test_input_file(request, "simple1.txt")
+
+    pl = Popen((("gzip", "-1c"),
+                ("gzip", "-dc"),
+                ("wc",),
+                ("sed", "-e", "s/  */\t/g")), "r", stdin=inf)
+    cp_pl_to_file(request, pl, ".wc")
+    pl.wait()
+
+    ts.diff_results_expected(request, ".wc")
+    common_checks(nopen, pl, "^gzip -1c <.*tests/input/simple1.txt | gzip -dc | wc | sed -e 's/  \\*/	/g' >.+$", is_re=True)
+
+def test_popen_exit_code():
+    nopen = ts.get_num_open_files()
+    pl = Popen(("false",))
+    with pytest.raises(ProcessException, match="^process exited 1: false$"):
         pl.wait()
-        self.commonChecks(nopen, pl, "sleep 1 2>[DataReader]")
-
-    def testTrivialFailPoll(self):
-        nopen = self.numOpenFiles()
-        pl = Pipeline([("sleep", "1"), ("false",)])
-        with self.assertRaisesRegex(ProcessException, "^process exited 1: sleep 1 | false$"):
-            pl.wait()
-        self.commonChecks(nopen, pl, "sleep 1 | false 2>[DataReader]")
-
-    def testTrivialStatus(self):
-        nopen = self.numOpenFiles()
-        pl = Pipeline(("true",))
-        pl.start()
-        self.assertTrue(pl.running)
-        self.assertFalse(pl.finished)
-        pl.wait()
-        self.assertFalse(pl.running)
-        self.assertTrue(pl.finished)
-        self.commonChecks(nopen, pl, "true 2>[DataReader]")
-
-    def testSimplePipe(self):
-        nopen = self.numOpenFiles()
-        log = LoggerForTests()
-        pl = Pipeline([("true",), ("true",)], logger=log.logger)
-        pl.wait()
-        self.commonChecks(nopen, pl, "true | true 2>[DataReader]")
-        self.assertEqual(log.data, """start: true | true 2>[DataReader]\n"""
-                         """success: true | true 2>[DataReader]\n""")
-
-    def testSimplePipeFail(self):
-        nopen = self.numOpenFiles()
-        log = LoggerForTests()
-        pl = Pipeline([("false",), ("true",)], logger=log.logger)
-        with self.assertRaisesRegex(ProcessException, "^process exited 1: false$"):
-            pl.wait()
-        self.commonChecks(nopen, pl, "false | true 2>[DataReader]")
-        self.assertRegex(log.data,
-                         re.compile("""^start: false | true 2>[DataReader]\n"""
-                                    """failure: false | true 2>[DataReader]: process exited 1: false\n.*""",
-                                    re.MULTILINE))
-
-    def testPathObj(self):
-        nopen = self.numOpenFiles()
-        log = LoggerForTests()
-        true_path = Path("/usr/bin/true")
-        pl = Pipeline([(true_path,), (true_path,)], logger=log.logger)
-        pl.wait()
-        self.commonChecks(nopen, pl, "/usr/bin/true | /usr/bin/true 2>[DataReader]")
-        self.assertEqual(log.data, """start: /usr/bin/true | /usr/bin/true 2>[DataReader]\n"""
-                         """success: /usr/bin/true | /usr/bin/true 2>[DataReader]\n""")
-
-    def testPipeFailStderr(self):
-        nopen = self.numOpenFiles()
-        # should report first failure
-        pl = Pipeline([("true",), _getProgWithErrorCmd(self), ("false",)], stderr=DataReader)
-        with self.assertRaises(ProcessException) as cm:
-            pl.wait()
-        self._checkProgWithError(cm.exception)
-        self.orphanChecks(nopen)
-
-    def testPipeFail3Stderr(self):
-        # all 3 process fail
-        nopen = self.numOpenFiles()
-        # should report first failure
-        pl = Pipeline([_getProgWithErrorCmd(self, "process0"),
-                       _getProgWithErrorCmd(self, "process1"),
-                       _getProgWithErrorCmd(self, "process2")],
-                      stderr=DataReader)
-        with self.assertRaises(ProcessException) as cm:
-            pl.wait()
-        # should be first process
-        self._checkProgWithError(cm.exception, "process0")
-        # check process
-        for i in range(3):
-            self._checkProgWithError(pl.procs[i].procExcept, "process{}".format(i))
-        self.orphanChecks(nopen)
-
-    def testExecFail(self):
-        # invalid executable
-        nopen = self.numOpenFiles()
-        dw = DataWriter("one\ntwo\nthree\n")
-        pl = Pipeline(("procDoesNotExist", "-r"), stdin=dw)
-        with self.assertRaises(ProcessException) as cm:
-            pl.wait()
-        self.assertRegex(str(cm.exception),
-                         "exec failed: procDoesNotExist -r.*")
-        self.assertIsNot(cm.exception.__cause__, None)
-        self.assertRegex(str(cm.exception.__cause__),
-                         "\\[Errno 2\\] No such file or directory: 'procDoesNotExist'.*")
-        self.commonChecks(nopen, pl, "procDoesNotExist -r <[DataWriter] 2>[DataReader]")
-
-    def testSignaled(self):
-        # process signals
-        nopen = self.numOpenFiles()
-        pl = Pipeline(("sh", "-c", "kill -11 $$"))
-        with self.assertRaises(ProcessException) as cm:
-            pl.wait()
-        expect = "process signaled: SIGSEGV: sh -c 'kill -11 $$'"
-        msg = str(cm.exception)
-        if not msg.startswith(expect):
-            self.fail("'" + msg + "' does not start with '"
-                      + expect + "', cause: " + str(getattr(cm.exception, "cause", None)))
-        self.commonChecks(nopen, pl, "sh -c 'kill -11 $$' 2>[DataReader]")
-
-    def testStdinMem(self):
-        # write from memory to stdin
-        nopen = self.numOpenFiles()
-        outf = self.getOutputFile(".out")
-        dw = DataWriter("one\ntwo\nthree\n")
-        pl = Pipeline(("sort", "-r"), stdin=dw, stdout=outf)
-        pl.wait()
-        self.diffExpected(".out")
-        self.commonChecks(nopen, pl, "^sort -r <\\[DataWriter\\] >.+/output/test_pipettor\\.PipelineTests\\.testStdinMem\\.out 2>\\[DataReader\\]$", isRe=True)
-
-    def testStdoutMem(self):
-        # read from stdout into memory
-        nopen = self.numOpenFiles()
-        inf = self.getInputFile("simple1.txt")
-        dr = DataReader()
-        pl = Pipeline(("sort", "-r"), stdin=inf, stdout=dr)
-        pl.wait()
-        self.assertEqual(dr.data, "two\nthree\nsix\none\nfour\nfive\n")
-        self.commonChecks(nopen, pl, "^sort -r <.+/input/simple1\\.txt >\\[DataReader\\]", isRe=True)
-
-    def testStdinStdoutMem(self):
-        # write and read from memory
-        nopen = self.numOpenFiles()
-        dw = DataWriter("one\ntwo\nthree\n")
-        dr = DataReader()
-        pl = Pipeline([("cat", "-u"), ("cat", "-u")], stdin=dw, stdout=dr)
-        pl.wait()
-        self.assertEqual(dr.data, "one\ntwo\nthree\n")
-        self.commonChecks(nopen, pl, "^cat -u <\\[DataWriter\\] \\| cat -u >\\[DataReader\\] 2>\\[DataReader\\]$", isRe=True)
-
-    def testFileMode(self):
-        with self.assertRaisesRegex(PipettorException, "^invalid or unsupported mode 'q' opening /dev/null"):
-            File("/dev/null", "q")
-
-    def testCollectStdoutErr(self):
-        # independent collection of stdout and stderr
-        nopen = self.numOpenFiles()
-        stdoutRd = DataReader()
-        stderrRd = DataReader()
-        pl = Pipeline(("sh", "-c", "echo this goes to stdout; echo this goes to stderr >&2"),
-                      stdout=stdoutRd, stderr=stderrRd)
-        pl.wait()
-        self.assertEqual(stdoutRd.data, "this goes to stdout\n")
-        self.assertEqual(stderrRd.data, "this goes to stderr\n")
-        self.commonChecks(nopen, pl, "sh -c 'echo this goes to stdout; echo this goes to stderr >&2' >[DataReader] 2>[DataReader]")
-
-    def testStdinMemBinary(self):
-        # binary write from memory to stdin
-        nopen = self.numOpenFiles()
-        outf = self.getOutputFile(".out")
-        fh = open(self.getInputFile("file.binary"), "rb")
-        dw = DataWriter(fh.read())
-        fh.close()
-        pl = Pipeline(("cat",), stdin=dw, stdout=outf)
-        pl.wait()
-        self.diffBinaryExpected(".out", expectedBasename="file.binary")
-        self.commonChecks(nopen, pl, "^cat <\\[DataWriter] >.*/output/test_pipettor.PipelineTests.testStdinMemBinary.out 2>\\[DataReader\\]$", isRe=True)
-
-    def testStdoutMemBinary(self):
-        # binary read from stdout into memory
-        nopen = self.numOpenFiles()
-        inf = self.getInputFile("file.binary")
-        dr = DataReader(binary=True)
-        pl = Pipeline(("cat",), stdin=inf, stdout=dr)
-        pl.wait()
-        fh = open(self.getOutputFile(".out"), "wb")
-        fh.write(dr.data)
-        fh.close()
-        self.diffBinaryExpected(".out", expectedBasename="file.binary")
-        self.commonChecks(nopen, pl, "^cat <.*/input/file.binary >\\[DataReader] 2>\\[DataReader\\]$", isRe=True)
-
-    def testWriteFile(self):
-        # test write to File object
-        nopen = self.numOpenFiles()
-        inf = self.getInputFile("simple1.txt")
-        outf = self.getOutputFile(".out")
-        # double cat actually found a bug
-        pl = Pipeline([("cat",), ("cat",)], stdin=inf, stdout=File(outf, "w"))
-        pl.wait()
-        self.diffExpected(".out")
-        self.commonChecks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/test_pipettor.PipelineTests.testWriteFile.out 2>\\[DataReader\\]$", isRe=True)
-
-    def testReadFile(self):
-        # test read and write to File object
-        nopen = self.numOpenFiles()
-        inf = self.getInputFile("simple1.txt")
-        outf = self.getOutputFile(".out")
-        pl = Pipeline([("cat",), ("cat",)], stdin=File(inf), stdout=File(outf, "w"))
-        pl.wait()
-        self.diffExpected(".out")
-        self.commonChecks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/test_pipettor.PipelineTests.testReadFile.out 2>\\[DataReader\\]$", isRe=True)
-
-    def testAppendFile(self):
-        # test append to File object
-        nopen = self.numOpenFiles()
-        inf = self.getInputFile("simple1.txt")
-        outf = self.getOutputFile(".out")
-        # double cat actually found a bug
-        pl = Pipeline([("cat",), ("cat",)], stdin=inf, stdout=File(outf, "w"), stderr=None)
-        pl.wait()
-        pl = Pipeline([("cat",), ("cat",)], stdin=inf, stdout=File(outf, "a"), stderr=None)
-        pl.wait()
-        self.diffExpected(".out")
-        self.commonChecks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/test_pipettor.PipelineTests.testAppendFile.out$", isRe=True)
-
-    def __bogusStdioExpectRe(self):
-        return "^invalid stdio specification object type: <class 'float'> 3\\.14159$"
-
-    def testBogusStdin(self):
-        # test stdin specification is not legal
-        nopen = self.numOpenFiles()
-        with self.assertRaisesRegex(PipettorException, self.__bogusStdioExpectRe()):
-            pl = Pipeline([("date",), ("date",)], stdin=3.14159)
-            pl.wait()
-        self.orphanChecks(nopen)
-
-    def testBogusStdout(self):
-        # test stdout specification is not legal
-        nopen = self.numOpenFiles()
-        with self.assertRaisesRegex(PipettorException, self.__bogusStdioExpectRe()):
-            pl = Pipeline([("date",), ("date",)], stdout=3.14159)
-            pl.wait()
-        self.orphanChecks(nopen)
-
-    def testBogusStderr(self):
-        # test stderr specification is not legal
-        nopen = self.numOpenFiles()
-        with self.assertRaisesRegex(PipettorException, self.__bogusStdioExpectRe()):
-            pl = Pipeline([("date",), ("date",)], stderr=3.14159)
-            pl.wait()
-        self.orphanChecks(nopen)
-
-    def testDataReaderShare(self):
-        # test stderr linked to stdout/stderr
-        nopen = self.numOpenFiles()
-        dr = DataReader()
-        pl = Pipeline([("date",), ("date",)], stdout=dr, stderr=dr)
-        pl.wait()
-        self.orphanChecks(nopen)
-
-    def testDataWriterBogusShare(self):
-        # test stderr specification is not legal
-        nopen = self.numOpenFiles()
-        dw = DataWriter("fred")
-        with self.assertRaisesRegex(PipettorException, "^DataWriter already bound to a process$"):
-            pl1 = Pipeline([("cat", "/dev/null"), ("cat", "/dev/null")], stdin=dw)
-            Pipeline([("cat", "/dev/null"), ("cat", "/dev/null")], stdin=dw)
-        pl1.shutdown()  # clean up unstarted process
-        self.orphanChecks(nopen)
-
-    def testIntArg(self):
-        nopen = self.numOpenFiles()
-        inf = self.getInputFile("simple1.txt")
-        dr = DataReader()
-        pl = Pipeline(("head", -2), stdin=inf, stdout=dr)
-        pl.wait()
-        self.assertEqual(dr.data, "one\ntwo\n")
-        self.commonChecks(nopen, pl, "^head -2 <.+/input/simple1\\.txt >\\[DataReader\\]", isRe=True)
-
-    def testStderrPipeRedir(self):
-        # stderr DataReader on multiple processes
-        stderr = DataReader(errors='backslashreplace')
-        cmds = (["sh", "-c", "echo command one >&2"],
-                ["sh", "-c", "echo COMMAND TWO >&2"])
-        pl = Pipeline(cmds, stdout='/dev/null', stderr=stderr)
-        pl.wait()
-        # can't predict order
-        err_sorted = list(sorted(stderr.data.strip().split('\n')))
-        self.assertEqual(err_sorted, ['COMMAND TWO', 'command one'])
+    for p in pl.procs:
+        assert p.returncode == 1
+    common_checks(nopen, pl, "^false >.+$", is_re=True)
 
 
-class PopenTests(PipettorTestBase):
-    def __init__(self, methodName):
-        super(PopenTests, self).__init__(methodName)
+simple_one_lines = ['one\n', 'two\n', 'three\n', 'four\n', 'five\n', 'six\n']
 
-    def cpFileToPl(self, inName, pl):
-        inf = self.getInputFile(inName)
-        fh = open(inf)
+def test_popen_read_dos(request):
+    with Popen(("cat", ts.get_test_input_file(request, "simple1.dos.txt")), mode="r") as fh:
+        lines = [l for l in fh]
+    assert lines == simple_one_lines
+
+def test_popen_read_mac(request):
+    with Popen(("cat", ts.get_test_input_file(request, "simple1.mac.txt")), mode="r") as fh:
+        lines = [l for l in fh]
+    assert lines == simple_one_lines
+
+def test_popen_sig_pipe():
+    # test not reading all of pipe output
+    nopen = ts.get_num_open_files()
+    pl = Popen([("yes",), ("true",)], "r")
+    pl.wait()
+    common_checks(nopen, pl, "^yes | true >.+ 2>\\[DataReader\\]$", is_re=True)
+
+def test_popen_read_as_ascii_replace(request):
+    # file contains unicode character outside of the ASCII range
+    nopen = ts.get_num_open_files()
+    inf = ts.get_test_input_file(request, "nonAscii.txt")
+    with Popen(["cat", inf], encoding='latin-1', errors="replace") as fh:
+        lines = [l[:-1] for l in fh]
+    assert ['Microtubules are assembled from dimers of a- and \xc3\x9f-tubulin.'] == lines
+    orphan_checks(nopen)
+
+def test_env_passing():
+    env = dict(os.environ)
+    env['PIPETTOR'] = "YES"
+
+    got_it = False
+    with Popen(["env"], env=env) as fh:
         for line in fh:
-            pl.write(line)
-        fh.close()
+            if line.strip() == "PIPETTOR=YES":
+                got_it = True
+    assert got_it, "PIPETTOR=YES not set in enviroment"
 
-    def cpPlToFile(self, pl, outExt):
-        outf = self.getOutputFile(outExt)
-        fh = open(outf, "w")
-        for line in pl:
-            fh.write(line)
-        fh.close()
+###
+# function tests
+###
 
-    def testWrite(self):
-        nopen = self.numOpenFiles()
-        outf = self.getOutputFile(".out")
-        outfGz = self.getOutputFile(".out.gz")
+def test_fn_write_file(request):
+    # test write to File object
+    nopen = ts.get_num_open_files()
+    inf = ts.get_test_input_file(request, "simple1.txt")
+    outf = ts.get_test_output_file(request, ".out")
+    run([("cat",), ("cat",)], stdin=inf, stdout=File(outf, "w"))
+    ts.diff_results_expected(request, ".out")
+    orphan_checks(nopen)
 
-        pl = Popen(("gzip", "-1"), "w", stdout=outfGz)
-        self.cpFileToPl("simple1.txt", pl)
-        pl.close()
-        self.commonChecks(nopen, pl, "gzip -1 <.+ >.*output/test_pipettor.PopenTests.testWrite.out.gz", isRe=True)
+def test_fn_path_obj():
+    nopen = ts.get_num_open_files()
+    true_path = Path("/usr/bin/true")
+    run([true_path])
+    orphan_checks(nopen)
 
-        # macOS Ventura: user gunzip rather than zcat, as zcat did not support .gz
-        Pipeline(("gunzip", "-c", outfGz), stdout=outf).wait()
-        self.diffExpected(".out")
+def test_fn_simple_pipe_fail():
+    nopen = ts.get_num_open_files()
+    with pytest.raises(ProcessException, match="^process exited 1: false$"):
+        run([("false",), ("true",)])
+    orphan_checks(nopen)
 
-    def testWriteFile(self):
-        nopen = self.numOpenFiles()
-        outf = self.getOutputFile(".out")
-        outfGz = self.getOutputFile(".out.gz")
+def test_fn_stdout_read(request):
+    # read from stdout into memory
+    nopen = ts.get_num_open_files()
+    inf = ts.get_test_input_file(request, "simple1.txt")
+    out = runout(("sort", "-r"), stdin=inf)
+    assert out == "two\nthree\nsix\none\nfour\nfive\n"
+    orphan_checks(nopen)
 
-        with open(outfGz, "w") as outfGzFh:
-            pl = Popen(("gzip", "-1"), "w", stdout=outfGzFh)
-            self.cpFileToPl("simple1.txt", pl)
-            pl.wait()
+def test_fn_stdout_read_fail(request):
+    # read from stdout into memory
+    nopen = ts.get_num_open_files()
+    inf = ts.get_test_input_file(request, "simple1.txt")
+    with pytest.raises(ProcessException) as cm:
+        runout([("sort", "-r"), _get_prog_with_error_cmd(request), ("false",)], stdin=inf)
+    check_prog_with_error(cm.value)
+    orphan_checks(nopen)
 
-        # macOS Ventura: don't used zcat; would need to use gzcat, but this is compatbile with all
-        Pipeline(("gunzip", "-c", outfGz), stdout=outf).wait()
-        self.diffExpected(".out")
-        self.commonChecks(nopen, pl, "gzip -1 <.* >.*output/test_pipettor.PopenTests.testWriteFile.out.gz", isRe=True)
+def test_fn_write_file_lex(request):
+    # test write to File object
+    nopen = ts.get_num_open_files()
+    inf = ts.get_test_input_file(request, "simple1.txt")
+    outf = ts.get_test_output_file(request, ".out")
+    runlex(["cat -u", ["cat", "-u"], "cat -n"], stdin=inf, stdout=File(outf, "w"))
+    ts.diff_results_expected(request, ".out")
+    orphan_checks(nopen)
 
-    def testWriteMult(self):
-        nopen = self.numOpenFiles()
-        outf = self.getOutputFile(".wc")
+def test_fn_stdout_read_lex(request):
+    # read from stdout into memory
+    nopen = ts.get_num_open_files()
+    inf = ts.get_test_input_file(request, "simple1.txt")
+    out = runlexout("sort -r", stdin=inf)
+    assert out == "two\nthree\nsix\none\nfour\nfive\n"
+    orphan_checks(nopen)
 
-        # grr, BSD wc adds an extract space, so just convert to tabs
-        pl = Popen((("gzip", "-1"),
-                    ("gzip", "-dc"),
-                    ("wc",),
-                    ("sed", "-e", "s/  */\t/g")), "w", stdout=outf)
-        self.cpFileToPl("simple1.txt", pl)
-        pl.wait()
-
-        self.diffExpected(".wc")
-        self.commonChecks(nopen, pl, "^gzip -1 <.+ | gzip -dc | wc | sed -e 's/  \\*/	/g' >.*output/test_pipettor.PopenTests.testWriteMult.wc$", isRe=True)
-
-    def testRead(self):
-        nopen = self.numOpenFiles()
-        inf = self.getInputFile("simple1.txt")
-        infGz = self.getOutputFile(".txt.gz")
-        Pipeline(("gzip", "-c", inf), stdout=infGz).wait()
-
-        pl = Popen(("gzip", "-dc"), "r", stdin=infGz)
-        self.cpPlToFile(pl, ".out")
-        pl.wait()
-
-        self.diffExpected(".out")
-        self.commonChecks(nopen, pl, "^gzip -dc <.*output/test_pipettor.PopenTests.testRead.txt.gz >.+$", isRe=True)
-
-    def testReadFor(self):
-        inf = self.getInputFile("simple1.txt")
-        infGz = self.getOutputFile(".txt.gz")
-        Pipeline(("gzip", "-c", inf), stdout=infGz).wait()
-
-        outf = self.getOutputFile(".out")
-        with open(outf, "w") as outfh:
-            for line in Popen(("zcat", infGz)):
-                outfh.write(line)
-        self.diffExpected(".out")
-
-    def testReadForError(self):
-        # error in for loop read
-        with self.assertRaisesRegex(ProcessException, "^process exited 1: zcat /does/not/exist$"):
-            for line in Popen(("zcat", "/does/not/exist")):
-                pass
-
-    def testReadMult(self):
-        nopen = self.numOpenFiles()
-        inf = self.getInputFile("simple1.txt")
-
-        pl = Popen((("gzip", "-1c"),
-                    ("gzip", "-dc"),
-                    ("wc",),
-                    ("sed", "-e", "s/  */\t/g")), "r", stdin=inf)
-        self.cpPlToFile(pl, ".wc")
-        pl.wait()
-
-        self.diffExpected(".wc")
-        self.commonChecks(nopen, pl, "^gzip -1c <.*tests/input/simple1.txt | gzip -dc | wc | sed -e 's/  \\*/	/g' >.+$", isRe=True)
-
-    def testExitCode(self):
-        nopen = self.numOpenFiles()
-        pl = Popen(("false",))
-        with self.assertRaisesRegex(ProcessException, "^process exited 1: false$"):
-            pl.wait()
-        for p in pl.procs:
-            self.assertTrue(p.returncode == 1)
-        self.commonChecks(nopen, pl, "^false >.+$", isRe=True)
-
-    simpleOneLines = ['one\n', 'two\n', 'three\n', 'four\n', 'five\n', 'six\n']
-
-    def testReadDos(self):
-        with Popen(("cat", self.getInputFile("simple1.dos.txt")), mode="r") as fh:
-            lines = [l for l in fh]
-        self.assertEqual(lines, self.simpleOneLines)
-
-    def testReadMac(self):
-        with Popen(("cat", self.getInputFile("simple1.mac.txt")), mode="r") as fh:
-            lines = [l for l in fh]
-        self.assertEqual(lines, self.simpleOneLines)
-
-    def testSigPipe(self):
-        # test not reading all of pipe output
-        nopen = self.numOpenFiles()
-        pl = Popen([("yes",), ("true",)], "r")
-        pl.wait()
-        self.commonChecks(nopen, pl, "^yes | true >.+ 2>\\[DataReader\\]$", isRe=True)
-
-    def testReadAsAsciiReplace(self):
-        # file contains unicode character outside of the ASCII range
-        nopen = self.numOpenFiles()
-        inf = self.getInputFile("nonAscii.txt")
-        with Popen(["cat", inf], encoding='latin-1', errors="replace") as fh:
-            lines = [l[:-1] for l in fh]
-        self.assertEqual(['Microtubules are assembled from dimers of a- and \xc3\x9f-tubulin.'], lines)
-        self.orphanChecks(nopen)
-
-    def testEnvPassing(self):
-        env = dict(os.environ)
-        env['PIPETTOR'] = "YES"
-
-        got_it = False
-        with Popen(["env"], env=env) as fh:
-            for line in fh:
-                if line.strip() == "PIPETTOR=YES":
-                    got_it = True
-        assert got_it, "PIPETTOR=YES not set in enviroment"
-
-class FunctionTests(PipettorTestBase):
-    def __init__(self, methodName):
-        super(FunctionTests, self).__init__(methodName)
-
-    def testWriteFile(self):
-        # test write to File object
-        nopen = self.numOpenFiles()
-        inf = self.getInputFile("simple1.txt")
-        outf = self.getOutputFile(".out")
-        run([("cat",), ("cat",)], stdin=inf, stdout=File(outf, "w"))
-        self.diffExpected(".out")
-        self.orphanChecks(nopen)
-
-    def testPathObj(self):
-        nopen = self.numOpenFiles()
-        true_path = Path("/usr/bin/true")
-        run([true_path])
-        self.orphanChecks(nopen)
-
-    def testSimplePipeFail(self):
-        nopen = self.numOpenFiles()
-        with self.assertRaisesRegex(ProcessException, "^process exited 1: false$"):
-            run([("false",), ("true",)])
-        self.orphanChecks(nopen)
-
-    def testStdoutRead(self):
-        # read from stdout into memory
-        nopen = self.numOpenFiles()
-        inf = self.getInputFile("simple1.txt")
-        out = runout(("sort", "-r"), stdin=inf)
-        self.assertEqual(out, "two\nthree\nsix\none\nfour\nfive\n")
-        self.orphanChecks(nopen)
-
-    def testStdoutReadFail(self):
-        # read from stdout into memory
-        nopen = self.numOpenFiles()
-        inf = self.getInputFile("simple1.txt")
-        with self.assertRaises(ProcessException) as cm:
-            runout([("sort", "-r"), _getProgWithErrorCmd(self), ("false",)], stdin=inf)
-        self._checkProgWithError(cm.exception)
-        self.orphanChecks(nopen)
-
-    def testWriteFileLex(self):
-        # test write to File object
-        nopen = self.numOpenFiles()
-        inf = self.getInputFile("simple1.txt")
-        outf = self.getOutputFile(".out")
-        runlex(["cat -u", ["cat", "-u"], "cat -n"], stdin=inf, stdout=File(outf, "w"))
-        self.diffExpected(".out")
-        self.orphanChecks(nopen)
-
-    def testStdoutReadLex(self):
-        # read from stdout into memory
-        nopen = self.numOpenFiles()
-        inf = self.getInputFile("simple1.txt")
-        out = runlexout("sort -r", stdin=inf)
-        self.assertEqual(out, "two\nthree\nsix\none\nfour\nfive\n")
-        self.orphanChecks(nopen)
-
-    def testEnvPassing(self):
-        env = dict(os.environ)
-        env['PIPETTOR'] = "YES"
-
-        lines = runout(["env"], env=env).splitlines()
-        assert "PIPETTOR=YES" in lines
-
-
-def suite():
-    ts = unittest.TestSuite()
-    ts.addTest(unittest.makeSuite(PipelineTests))
-    ts.addTest(unittest.makeSuite(PopenTests))
-    ts.addTest(unittest.makeSuite(FunctionTests))
-    return ts
-
-
-if __name__ == '__main__':
-    unittest.main()
+def test_fn_env_passing():
+    env = dict(os.environ)
+    env['PIPETTOR'] = "YES"
+    lines = runout(["env"], env=env).splitlines()
+    assert "PIPETTOR=YES" in lines
