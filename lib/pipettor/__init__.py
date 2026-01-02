@@ -41,7 +41,7 @@ Use ``str.splitlines()`` to split the result into lines.
 """ + doc_error_handling
 
 def _lexcmds(cmds):
-    """spit pipeline specification into arguments"""
+    """split pipeline specification into arguments"""
     if isinstance(cmds, str):
         return shlex.split(cmds)
     else:
