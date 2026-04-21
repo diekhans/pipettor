@@ -41,14 +41,14 @@ File-like objects to or from a pipeline maybe create using the
 Bidirectional (interleaved read/write) pipelines are created with
 mode ``'r+'`` (or ``'w+'``, or ``'rb+'`` for binary).  Neither
 ``stdin`` nor ``stdout`` may be given; both are connected to the
-``Popen`` object and accessed with the usual file-like methods.  Use
-``buffering=1`` for line-buffered text so writes are flushed each
-line, alternate writes with reads to keep the kernel pipe buffers
-drained, and call :meth:`pipettor.Popen.close_stdin` when done
-writing so the child sees EOF::
+``Popen`` object and accessed with the usual file-like methods.
+Background threads bridge the kernel pipes to in-process queues so
+interleaved writes and reads do not deadlock on a full pipe buffer.
+When finished writing, call :meth:`pipettor.Popen.close_stdin` so the
+child sees EOF::
 
     import pipettor
-    with pipettor.Popen([("cat", "-u"), ("cat", "-u")], "r+", buffering=1) as pl:
+    with pipettor.Popen([("cat", "-u"), ("cat", "-u")], "r+") as pl:
         responses = []
         for i in range(20):
             pl.write(f"request {i}\n")
@@ -56,12 +56,14 @@ writing so the child sees EOF::
         pl.close_stdin()
         tail = pl.read()          # drain any remaining output
 
-For mixed binary/text on the two sides, or for patterns where one
-side is much larger than the other, build a :class:`pipettor.Pipeline`
+The queue is unbounded by default; pass ``max_queue=N`` to cap the
+number of buffered items when the producer may outrun the consumer.
+
+For mixed binary/text on the two sides, build a :class:`pipettor.Pipeline`
 directly with :class:`pipettor.StreamReader` and
 :class:`pipettor.StreamWriter` instances, which accept independent
-``binary``, ``buffering``, ``encoding``, ``errors``, and ``newline``
-arguments.
+``binary``, ``buffering``, ``encoding``, ``errors``, ``newline``, and
+``max_queue`` arguments.
          
 In-memory data can be also be written to pipelines using :class:`pipettor.DataWriter` objects::
 

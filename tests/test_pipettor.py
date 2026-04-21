@@ -4,8 +4,10 @@ import pytest
 import sys
 import os
 import os.path as osp
+import io
 import re
 import shutil
+import logging
 from pathlib import Path
 
 sys.path = [osp.normpath(osp.dirname(__file__) + "/../lib"),
@@ -483,7 +485,6 @@ def test_popen_invalid_mode_empty():
 
 def test_popen_iobase_conformance():
     # Popen should be a proper io.IOBase subclass
-    import io
     with Popen(("echo", "hi"), "r") as p:
         assert isinstance(p, io.IOBase)
         assert p.readable()
@@ -497,7 +498,6 @@ def test_popen_iobase_conformance():
 
 def test_popen_bidi_fileno_ambiguous():
     # in bidi mode fileno cannot choose a side
-    import io
     with Popen(("cat",), "r+") as p:
         with pytest.raises(io.UnsupportedOperation):
             p.fileno()
@@ -556,8 +556,9 @@ def test_stream_reader_file_like_attrs():
     assert sr.readable() and not sr.writable()
     assert not sr.seekable()
     assert not sr.isatty()
-    assert sr.fileno() >= 0
-    sr.flush()
+    # fileno is not meaningful with the threaded bridge
+    with pytest.raises(io.UnsupportedOperation):
+        sr.fileno()
     assert str(sr) == "[StreamReader]"
     assert sr.readlines() == ["hi\n"]
     pl.wait()
@@ -583,21 +584,18 @@ def test_stream_writer_file_like_attrs():
     assert str(sw) == "[StreamWriter]"
 
 def test_stream_reader_context_manager():
-    sr = StreamReader()
-    Pipeline(("echo", "ctx"), stdout=sr).wait()
-    with sr as s:
-        assert s is sr
+    with StreamReader() as sr:
+        Pipeline(("echo", "ctx"), stdout=sr).wait()
+        # sr is closed by Pipeline._finish; IOBase context manager just exits
     assert sr.closed
 
 def test_popen_poll_unsupported():
-    import io
     with Popen(("true",), "r") as pl:
         with pytest.raises(io.UnsupportedOperation):
             pl.poll()
 
 def test_popen_tell_unsupported():
     # pipes are not seekable, so tell() on the underlying pipe fh raises
-    import io
     with Popen(("echo", "x"), "r") as pl:
         with pytest.raises(io.UnsupportedOperation):
             pl.tell()
@@ -648,19 +646,18 @@ def test_default_logger_setters():
     from pipettor import (setDefaultLogger, getDefaultLogger,
                           setDefaultLogLevel, getDefaultLogLevel,
                           setDefaultLogging)
-    import logging as _logging
     orig_logger = getDefaultLogger()
     orig_level = getDefaultLogLevel()
     try:
         setDefaultLogger("test_pipettor_logger")
         assert getDefaultLogger().name == "test_pipettor_logger"
-        setDefaultLogger(_logging.getLogger("direct"))
+        setDefaultLogger(logging.getLogger("direct"))
         assert getDefaultLogger().name == "direct"
-        setDefaultLogLevel(_logging.INFO)
-        assert getDefaultLogLevel() == _logging.INFO
-        setDefaultLogging("combined", _logging.WARNING)
+        setDefaultLogLevel(logging.INFO)
+        assert getDefaultLogLevel() == logging.INFO
+        setDefaultLogging("combined", logging.WARNING)
         assert getDefaultLogger().name == "combined"
-        assert getDefaultLogLevel() == _logging.WARNING
+        assert getDefaultLogLevel() == logging.WARNING
         setDefaultLogging(None, None)  # both None = no-op
         assert getDefaultLogger().name == "combined"
     finally:
@@ -671,8 +668,7 @@ def test_logger_as_string_arg():
     # logger kwarg resolves a string to a logger
     log = ts.LoggerForTests()
     log.logger.name = "pipettor_str_arg_test"
-    import logging as _logging
-    _logging.getLogger("pipettor_str_arg_test").handlers = log.logger.handlers
+    logging.getLogger("pipettor_str_arg_test").handlers = log.logger.handlers
     Pipeline(("true",), logger="pipettor_str_arg_test").wait()
 
 def test_env_passing():

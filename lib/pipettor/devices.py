@@ -3,7 +3,9 @@
 pipettor interfaces to files and pipes, as well as some other IPC stuff.
 """
 import os
+import io
 import errno
+import queue
 import threading
 from pipettor.exceptions import PipettorException
 
@@ -272,21 +274,42 @@ class File(Dev):
             self._write_fd = None
 
 
-class _StreamDev(Dev):
-    """Shared base for StreamReader and StreamWriter.  A pipe is created
-    when bound to a process.  The parent-side end is opened as a
-    file-like object; subclasses delegate file-like methods to it."""
+class _StreamDev(Dev, io.IOBase):
+    """Shared base for :class:`StreamReader` and :class:`StreamWriter`.
 
-    def __init__(self, *, binary=False, buffering=-1, encoding=None, errors=None, newline=None):
+    A pipe is created when the device is bound to a process; the
+    parent-side end is opened as a file-like object.  A background
+    thread bridges that file handle and an in-process queue so that
+    the user's read/write calls do not race the kernel pipe buffer:
+    the pipe is always drained/filled by the thread regardless of
+    when the user consumes or produces.  This makes fully interleaved
+    bidirectional use deadlock-free (at the cost of buffering through
+    the queue).
+
+    ``max_queue`` bounds the queue size (items, not bytes); ``0`` (the
+    default) is unbounded.  A bounded queue is needed only when the
+    producer can vastly outrun the consumer and buffered memory
+    growth must be limited; in that case the writer's ``write`` or
+    the reader thread's ``put`` will block until the consumer catches
+    up, re-introducing a cooperative form of back-pressure.
+    """
+
+    _EOF = object()
+
+    def __init__(self, *, binary=False, buffering=-1, encoding=None, errors=None, newline=None, max_queue=0):
         super().__init__()
         self.binary = binary
         self.buffering = buffering
         self.encoding = encoding
         self.errors = errors
         self.newline = newline
+        self.max_queue = max_queue
         self._process = None
         self._child_fd = None
         self._fh = None
+        self._queue = queue.Queue(maxsize=max_queue)
+        self._thread = None
+        self._bridge_exc = None
 
     def _open_parent_fh(self, parent_fd, parent_mode):
         self._fh = open(parent_fd, parent_mode, buffering=self.buffering,
@@ -296,8 +319,15 @@ class _StreamDev(Dev):
         if self._child_fd is not None:
             os.close(self._child_fd)
             self._child_fd = None
+        self._thread = threading.Thread(target=self._bridge_loop,
+                                        name=type(self).__name__ + "Bridge",
+                                        daemon=True)
+        self._thread.start()
 
-    def close(self):
+    def _bridge_loop(self):
+        raise NotImplementedError
+
+    def _close_fh(self):
         if self._fh is not None:
             if not self._fh.closed:
                 try:
@@ -309,43 +339,41 @@ class _StreamDev(Dev):
             os.close(self._child_fd)
             self._child_fd = None
 
+    def _raise_bridge_exc(self):
+        if self._bridge_exc is not None:
+            exc = self._bridge_exc
+            self._bridge_exc = None
+            raise exc
+
     @property
     def closed(self):
+        # pre-bind state is not "closed" (so context-manager enter works
+        # on an unbound device); once bound, track the underlying fh.
+        if self._fh is None and self._process is None:
+            return False
         return self._fh is None or self._fh.closed
-
-    def flush(self):
-        if self._fh is not None:
-            self._fh.flush()
-
-    def fileno(self):
-        return self._fh.fileno()
-
-    def isatty(self):
-        return False
-
-    def seekable(self):
-        return False
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self.close()
 
 
 class StreamReader(_StreamDev):
-    """A file-like object for reading the stdout of a pipeline in the
-    parent process.  Bound as the ``stdout`` of a :class:`Pipeline`; the
-    child writes and the parent reads from this object using standard
-    file-like methods (``read``, ``readline``, ``__iter__``, ...).
+    """A file-like object for reading pipeline stdout in the parent.
 
-    Does not accumulate data or start a thread: reads come directly
-    from the pipe.  The caller is responsible for draining output so
-    the child is not blocked on a full pipe.
+    Bound as the ``stdout`` of a :class:`Pipeline`.  A background
+    thread reads the child's output from the kernel pipe into a
+    queue; the parent's ``read``/``readline``/``__iter__`` pull from
+    that queue.  Because the thread keeps the pipe drained, the child
+    never blocks on a full stdout pipe regardless of the parent's
+    read cadence.
 
-    ``binary`` selects bytes vs str; buffering, encoding, errors, and
-    newline are as in :func:`open`.
+    ``binary`` selects bytes vs str; ``buffering``, ``encoding``,
+    ``errors``, and ``newline`` are as in :func:`open`.  ``max_queue``
+    bounds the in-memory buffer (items).
     """
+
+    _READ_CHUNK = 8192
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._residual = b'' if self.binary else ''
 
     def __str__(self):
         return "[StreamReader]"
@@ -361,6 +389,35 @@ class StreamReader(_StreamDev):
         assert process is self._process
         return self._child_fd
 
+    def _bridge_loop(self):
+        "drain the pipe into the queue; terminates on EOF or fh close"
+        try:
+            while True:
+                if self.binary:
+                    chunk = self._fh.read1(self._READ_CHUNK)
+                else:
+                    chunk = self._fh.readline()
+                if not chunk:
+                    break
+                self._queue.put(chunk)
+        except (ValueError, OSError) as ex:
+            # ValueError when fh is closed from under us; OSError on
+            # BrokenPipeError etc.  Treat as EOF.
+            if not isinstance(ex, (ValueError, BrokenPipeError)):
+                self._bridge_exc = ex
+        except Exception as ex:
+            self._bridge_exc = ex
+        finally:
+            self._queue.put(self._EOF)
+
+    def close(self):
+        # fh close makes the bridge loop exit; then join.
+        self._close_fh()
+        if self._thread is not None:
+            self._thread.join()
+            self._thread = None
+        self._raise_bridge_exc()
+
     def readable(self):
         return True
 
@@ -368,31 +425,79 @@ class StreamReader(_StreamDev):
         return False
 
     def read(self, size=-1):
-        return self._fh.read(size)
+        empty = b'' if self.binary else ''
+        parts = [self._residual] if self._residual else []
+        total = len(self._residual)
+        self._residual = empty
+        while size < 0 or total < size:
+            item = self._queue.get()
+            if item is self._EOF:
+                self._queue.put(self._EOF)   # keep sentinel for future reads
+                break
+            parts.append(item)
+            total += len(item)
+        combined = empty.join(parts)
+        if size >= 0 and len(combined) > size:
+            self._residual = combined[size:]
+            combined = combined[:size]
+        return combined
 
     def readline(self, size=-1):
-        return self._fh.readline(size)
+        empty = b'' if self.binary else ''
+        sep = b'\n' if self.binary else '\n'
+        buf = self._residual
+        self._residual = empty
+        while sep not in buf:
+            if size >= 0 and len(buf) >= size:
+                break
+            item = self._queue.get()
+            if item is self._EOF:
+                self._queue.put(self._EOF)
+                break
+            buf += item
+        if sep in buf:
+            idx = buf.index(sep) + 1
+        else:
+            idx = len(buf)
+        if size >= 0 and idx > size:
+            idx = size
+        line, self._residual = buf[:idx], buf[idx:]
+        return line
 
     def readlines(self, hint=-1):
-        return self._fh.readlines(hint)
+        lines = []
+        while True:
+            line = self.readline()
+            if not line:
+                break
+            lines.append(line)
+        return lines
 
     def __iter__(self):
-        return iter(self._fh)
+        while True:
+            line = self.readline()
+            if not line:
+                return
+            yield line
 
     def __next__(self):
-        return next(self._fh)
+        line = self.readline()
+        if not line:
+            raise StopIteration
+        return line
 
 
 class StreamWriter(_StreamDev):
-    """A file-like object for writing to the stdin of a pipeline from the
-    parent process.  Bound as the ``stdin`` of a :class:`Pipeline`; the
-    parent writes and the child reads from the underlying pipe.
+    """A file-like object for writing to pipeline stdin in the parent.
 
-    Does not start a thread: writes go directly to the pipe.  Call
-    :meth:`close` after the last write to signal EOF to the child.
+    Bound as the ``stdin`` of a :class:`Pipeline`.  The parent's
+    ``write``/``writelines`` enqueue data; a background thread drains
+    the queue to the kernel pipe.  Because enqueueing does not touch
+    the pipe, the parent never blocks on a full stdin pipe regardless
+    of the child's read cadence.
 
-    ``binary`` selects bytes vs str; buffering, encoding, errors, and
-    newline are as in :func:`open`.
+    Call :meth:`close` after the last write to send EOF to the child;
+    the background thread flushes and closes the underlying pipe.
     """
 
     def __str__(self):
@@ -409,6 +514,47 @@ class StreamWriter(_StreamDev):
         assert process is self._process
         return self._child_fd
 
+    def _bridge_loop(self):
+        """drain the queue into the pipe; terminates on EOF sentinel.
+
+        Each item is flushed to the kernel pipe immediately so that an
+        interleaved reader sees the bytes as soon as they're produced,
+        regardless of the parent-side fh's buffering mode."""
+        try:
+            while True:
+                item = self._queue.get()
+                if item is self._EOF:
+                    break
+                try:
+                    self._fh.write(item)
+                    self._fh.flush()
+                except BrokenPipeError:
+                    # child closed stdin; discard remainder
+                    self._drain_queue_after_broken_pipe()
+                    return
+        except Exception as ex:
+            self._bridge_exc = ex
+        finally:
+            try:
+                if self._fh is not None and not self._fh.closed:
+                    self._fh.flush()
+            except Exception:
+                pass
+
+    def _drain_queue_after_broken_pipe(self):
+        while True:
+            item = self._queue.get()
+            if item is self._EOF:
+                return
+
+    def close(self):
+        if self._thread is not None and self._thread.is_alive():
+            self._queue.put(self._EOF)
+            self._thread.join()
+            self._thread = None
+        self._close_fh()
+        self._raise_bridge_exc()
+
     def readable(self):
         return False
 
@@ -416,10 +562,14 @@ class StreamWriter(_StreamDev):
         return True
 
     def write(self, data):
-        return self._fh.write(data)
+        if self._fh is None:
+            raise ValueError("write to closed StreamWriter")
+        self._queue.put(data)
+        return len(data)
 
     def writelines(self, lines):
-        return self._fh.writelines(lines)
+        for line in lines:
+            self.write(line)
 
 
 class _SiblingPipe(Dev):
