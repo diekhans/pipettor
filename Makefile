@@ -79,9 +79,7 @@ test-all:
 	tox
 
 coverage:
-	${COVERAGE} run -m pytest ${PYTEST_OPTS} tests
-	${COVERAGE} report -m
-	${COVERAGE} html
+	${PYTEST} --cov=pipettor --cov-branch --cov-report=term-missing --cov-report=html tests
 	${BROWSER} htmlcov/index.html
 
 docs:

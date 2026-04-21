@@ -673,7 +673,7 @@ class Popen(Pipeline, io.IOBase):
     def fileno(self):
         "get the integer OS-dependent file handle"
         if self._read_fh is not None and self._write_fh is not None:
-            self._unsupported("fileno (ambiguous in bidirectional mode)")
+            raise io.UnsupportedOperation("fileno() is ambiguous in bidirectional mode")
         fh = self._read_fh or self._write_fh
         return fh.fileno()
 
@@ -709,11 +709,11 @@ class Popen(Pipeline, io.IOBase):
             super().wait()
 
     def poll(self):
-        "poll is not allowed for Pipeline objects"
+        "poll is not allowed for Popen objects"
         # FIXME: don't know what to do about our open pipe keeping process from
         # exiting so we can get a status, so disallow it. Not sure how to
         # address this.  Can probably address this with select on pipe.
-        self._unsupported("poll")
+        raise io.UnsupportedOperation("poll")
 
 
 # extend documentation from common text

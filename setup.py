@@ -24,11 +24,13 @@ extras_require = {
         "twine>=1.11",
         "pytest>=5.3",
         "pytest-xdist>=3.6",
+        "pytest-cov>=4.1",
         "vulture>=2.1",
     ],
     "test": [
         "pytest>=5.3",
         "pytest-xdist>=3.6",
+        "pytest-cov>=4.1",
     ],
 }
 

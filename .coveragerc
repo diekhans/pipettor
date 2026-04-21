@@ -1,0 +1,16 @@
+[run]
+branch = True
+source = lib/pipettor
+omit =
+    */docstrings.py
+
+[report]
+exclude_lines =
+    pragma: no cover
+    raise NotImplementedError
+    if __name__ == .__main__.:
+show_missing = True
+skip_covered = False
+
+[html]
+directory = htmlcov
