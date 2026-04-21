@@ -151,15 +151,24 @@ class DataReader(Dev):
 class DataWriter(Dev):
     """Object to asynchronously write data to process from memory via a pipe.  A
     thread is use to prevent deadlock when both reading and writing to a child
-    pipeline.  Text or binary output is determined by the type of data.
+    pipeline.
+
+    ``data`` may be ``str``, ``bytes``, or an iterable yielding such
+    items (e.g. a generator).  For ``str``/``bytes`` the type selects
+    text vs binary.  For an iterable, pass ``binary=True`` for bytes.
 
     The buffering, encoding, and errors arguments are as used in
     the open() function.
     """
 
-    def __init__(self, data, *, buffering=-1, encoding=None, errors=None, newline=None):
+    def __init__(self, data, *, binary=False, buffering=-1, encoding=None, errors=None, newline=None):
         super().__init__()
-        binary = not isinstance(data, str)
+        if isinstance(data, str):
+            binary = False
+            data = (data,)
+        elif isinstance(data, bytes):
+            binary = True
+            data = (data,)
         self._data = data
         self._thread = None
         self._process = None
@@ -209,7 +218,8 @@ class DataWriter(Dev):
         "write thread function"
         assert self._read_fd is None
         try:
-            self._write_fh.write(self._data)
+            for chunk in self._data:
+                self._write_fh.write(chunk)
             self._write_fh.close()
             self._write_fh = None
         except IOError as ex:
@@ -260,6 +270,156 @@ class File(Dev):
         if self._write_fd is not None:
             os.close(self._write_fd)
             self._write_fd = None
+
+
+class _StreamDev(Dev):
+    """Shared base for StreamReader and StreamWriter.  A pipe is created
+    when bound to a process.  The parent-side end is opened as a
+    file-like object; subclasses delegate file-like methods to it."""
+
+    def __init__(self, *, binary=False, buffering=-1, encoding=None, errors=None, newline=None):
+        super().__init__()
+        self.binary = binary
+        self.buffering = buffering
+        self.encoding = encoding
+        self.errors = errors
+        self.newline = newline
+        self._process = None
+        self._child_fd = None
+        self._fh = None
+
+    def _open_parent_fh(self, parent_fd, parent_mode):
+        self._fh = open(parent_fd, parent_mode, buffering=self.buffering,
+                        encoding=self.encoding, errors=self.errors, newline=self.newline)
+
+    def _post_start_parent(self):
+        if self._child_fd is not None:
+            os.close(self._child_fd)
+            self._child_fd = None
+
+    def close(self):
+        if self._fh is not None:
+            if not self._fh.closed:
+                try:
+                    self._fh.close()
+                except BrokenPipeError:
+                    pass
+            self._fh = None
+        if self._child_fd is not None:
+            os.close(self._child_fd)
+            self._child_fd = None
+
+    @property
+    def closed(self):
+        return self._fh is None or self._fh.closed
+
+    def flush(self):
+        if self._fh is not None:
+            self._fh.flush()
+
+    def fileno(self):
+        return self._fh.fileno()
+
+    def isatty(self):
+        return False
+
+    def seekable(self):
+        return False
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+
+
+class StreamReader(_StreamDev):
+    """A file-like object for reading the stdout of a pipeline in the
+    parent process.  Bound as the ``stdout`` of a :class:`Pipeline`; the
+    child writes and the parent reads from this object using standard
+    file-like methods (``read``, ``readline``, ``__iter__``, ...).
+
+    Does not accumulate data or start a thread: reads come directly
+    from the pipe.  The caller is responsible for draining output so
+    the child is not blocked on a full pipe.
+
+    ``binary`` selects bytes vs str; buffering, encoding, errors, and
+    newline are as in :func:`open`.
+    """
+
+    def __str__(self):
+        return "[StreamReader]"
+
+    def _bind_write_to_process(self, process):
+        if self._process is not None:
+            raise PipettorException("StreamReader already bound to a process")
+        self._process = process
+        parent_fd, self._child_fd = os.pipe()
+        self._open_parent_fh(parent_fd, "rb" if self.binary else "r")
+
+    def get_child_write_fd(self, process):
+        assert process is self._process
+        return self._child_fd
+
+    def readable(self):
+        return True
+
+    def writable(self):
+        return False
+
+    def read(self, size=-1):
+        return self._fh.read(size)
+
+    def readline(self, size=-1):
+        return self._fh.readline(size)
+
+    def readlines(self, hint=-1):
+        return self._fh.readlines(hint)
+
+    def __iter__(self):
+        return iter(self._fh)
+
+    def __next__(self):
+        return next(self._fh)
+
+
+class StreamWriter(_StreamDev):
+    """A file-like object for writing to the stdin of a pipeline from the
+    parent process.  Bound as the ``stdin`` of a :class:`Pipeline`; the
+    parent writes and the child reads from the underlying pipe.
+
+    Does not start a thread: writes go directly to the pipe.  Call
+    :meth:`close` after the last write to signal EOF to the child.
+
+    ``binary`` selects bytes vs str; buffering, encoding, errors, and
+    newline are as in :func:`open`.
+    """
+
+    def __str__(self):
+        return "[StreamWriter]"
+
+    def _bind_read_to_process(self, process):
+        if self._process is not None:
+            raise PipettorException("StreamWriter already bound to a process")
+        self._process = process
+        self._child_fd, parent_fd = os.pipe()
+        self._open_parent_fh(parent_fd, "wb" if self.binary else "w")
+
+    def get_child_read_fd(self, process):
+        assert process is self._process
+        return self._child_fd
+
+    def readable(self):
+        return False
+
+    def writable(self):
+        return True
+
+    def write(self, data):
+        return self._fh.write(data)
+
+    def writelines(self, lines):
+        return self._fh.writelines(lines)
 
 
 class _SiblingPipe(Dev):

@@ -4,7 +4,7 @@ Robust, easy to use Unix process pipelines.
 import shlex
 from pipettor.docstrings import doc_cmd_std_args, doc_open_other_args, doc_raises, doc_error_handling
 from pipettor.exceptions import PipettorException, ProcessException
-from pipettor.devices import DataReader, DataWriter, File
+from pipettor.devices import DataReader, DataWriter, File, StreamReader, StreamWriter
 from pipettor.processes import LOGGER_NAME  # noqa
 from pipettor.processes import Pipeline, Popen, setDefaultLogger, getDefaultLogger, setDefaultLogLevel, getDefaultLogLevel, setDefaultLogging
 
@@ -73,6 +73,7 @@ def runlexout(cmds, stdin=None, stderr=DataReader, env=None, logger=None, logLev
 # included in the docs/library.rst files
 __all__ = (PipettorException.__name__, ProcessException.__name__,
            DataReader.__name__, DataWriter.__name__,
+           StreamReader.__name__, StreamWriter.__name__,
            File.__name__, Pipeline.__name__, Popen.__name__,
            setDefaultLogger.__name__, getDefaultLogger.__name__,
            setDefaultLogLevel.__name__, getDefaultLogLevel.__name__, setDefaultLogging.__name__,

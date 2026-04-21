@@ -11,7 +11,9 @@ sys.path = [osp.normpath(osp.dirname(__file__) + "/../lib"),
             osp.normpath(osp.dirname(__file__))] + sys.path
 
 import testing_support as ts
-from pipettor import Pipeline, Popen, ProcessException, PipettorException, DataReader, DataWriter, File, run, runout, runlex, runlexout
+from pipettor import (Pipeline, Popen, ProcessException, PipettorException,
+                      DataReader, DataWriter, StreamReader, StreamWriter,
+                      File, run, runout, runlex, runlexout)
 
 def _get_prog_with_error_cmd(request, *args):
     return (os.path.join(ts.get_test_dir(request), "progWithError"),) + args
@@ -265,6 +267,7 @@ def test_append_file(request):
     pl.wait()
     ts.diff_results_expected(request, ".out")
     common_checks(nopen, pl, "cat <.*/input/simple1.txt \\| cat >.*/output/test_pipettor.py::test_append_file.out$", is_re=True)
+
 
 _bogus_stdio_expect_re = "^invalid stdio specification object type: <class 'float'> 3\\.14159$"
 
@@ -549,3 +552,69 @@ def test_fn_env_passing():
     env['PIPETTOR'] = "YES"
     lines = runout(["env"], env=env).splitlines()
     assert "PIPETTOR=YES" in lines
+
+###
+# StreamReader / StreamWriter tests
+###
+
+def test_stream_reader():
+    # StreamReader reads pipeline output directly, line-by-line
+    nopen = ts.get_num_open_files()
+    expected = [f"line{i}\n" for i in range(10)]
+    sr = StreamReader()
+    pl = Pipeline([("cat", "-u"), ("cat", "-u")],
+                  stdin=DataWriter("".join(expected)), stdout=sr)
+    pl.start()
+    got = [line for line in sr]
+    pl.wait()
+    assert got == expected
+    orphan_checks(nopen)
+
+def test_stream_writer():
+    # StreamWriter pushes lines to pipeline stdin; read back via DataReader
+    nopen = ts.get_num_open_files()
+    dr = DataReader()
+    sw = StreamWriter()
+    pl = Pipeline([("cat", "-u"), ("cat", "-u")], stdin=sw, stdout=dr)
+    pl.start()
+    expected = [f"line{i}\n" for i in range(50)]
+    for ln in expected:
+        sw.write(ln)
+    sw.close()
+    pl.wait()
+    assert dr.data == "".join(expected)
+    orphan_checks(nopen)
+
+def test_stream_interleaved():
+    # StreamWriter + StreamReader interleaved loop on main thread.
+    # cat -u is unbuffered so each write produces a matching line;
+    # alternating keeps both pipes drained, no deadlock.
+    nopen = ts.get_num_open_files()
+    sw = StreamWriter()
+    sr = StreamReader()
+    pl = Pipeline([("cat", "-u"), ("cat", "-u")], stdin=sw, stdout=sr)
+    pl.start()
+    got = []
+    for i in range(20):
+        sw.write(f"line{i}\n")
+        sw.flush()
+        got.append(sr.readline())
+    sw.close()
+    assert sr.read() == ""
+    pl.wait()
+    assert got == [f"line{i}\n" for i in range(20)]
+    orphan_checks(nopen)
+
+def test_stream_binary():
+    # binary StreamReader/StreamWriter roundtrip
+    nopen = ts.get_num_open_files()
+    sw = StreamWriter(binary=True)
+    sr = StreamReader(binary=True)
+    pl = Pipeline(("cat",), stdin=sw, stdout=sr)
+    pl.start()
+    payload = bytes(range(256))
+    sw.write(payload)
+    sw.close()
+    assert sr.read() == payload
+    pl.wait()
+    orphan_checks(nopen)
