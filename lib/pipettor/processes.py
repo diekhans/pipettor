@@ -9,7 +9,7 @@ import logging
 import subprocess
 import enum
 from pathlib import Path
-from io import UnsupportedOperation
+import io
 from threading import RLock
 from pipettor.docstrings import doc_open_mode_arg, doc_cmd_std_args, doc_open_other_args, doc_raises, doc_error_handling
 from pipettor.devices import Dev
@@ -508,17 +508,37 @@ class Pipeline(object):
 # extend documentation from common text
 Pipeline.__doc__ += '\n' + doc_cmd_std_args
 
-class Popen(Pipeline):
+class Popen(Pipeline, io.IOBase):
     """
-    File-like object of processes to read from or write to a Pipeline.
-    Only one of ``stdin`` or ``stdout`` maybe specified, with the
-    other end being read or written via the Popen instance.
+    File-like object of processes to read from and/or write to a Pipeline.
 
-    - Read pipeline (`'r'`):
+    Modes (optional ``'b'`` suffix selects binary):
+
+    - Read pipeline (``'r'``):
       stdin → cmd[0] → ... → cmd[n] → Popen
+      ``stdout`` must not be given.
 
-    - Write pipeline (`'w'`):
+    - Write pipeline (``'w'``):
       Popen → cmd[0] → ... → cmd[n] → stdout
+      ``stdin`` must not be given.
+
+    - Bidirectional pipeline (``'r+'`` or ``'w+'``):
+      Popen → cmd[0] → ... → cmd[n] → Popen
+      Neither ``stdin`` nor ``stdout`` may be given; both are
+      connected to the ``Popen`` object.  Use :meth:`write` /
+      :meth:`read` / :meth:`readline` as with a normal file-like
+      object.
+
+      The caller is responsible for avoiding deadlock from a full
+      kernel pipe buffer.  For line-oriented, request/response style
+      interaction, pass ``buffering=1`` (line-buffered) and alternate
+      writes with reads so neither pipe fills.  When finished writing,
+      call :meth:`close_stdin` to send EOF to the child and then drain
+      remaining output before :meth:`close` / :meth:`wait`.
+
+      For asymmetric producer/consumer patterns where one side is much
+      larger, drive writes or reads on a separate thread, or use
+      :class:`DataWriter` / :class:`DataReader` instead.
 
     """   # doc extended below after class creation
 
@@ -529,77 +549,94 @@ class Popen(Pipeline):
     def __init__(self, cmds, mode='r', *, stdin=None, stdout=None, stderr=None, env=None, logger=None, logLevel=None,
                  buffering=-1, encoding=None, errors=None, newline=None):
         self.mode = mode
-        self._pipeline_fh = None
-        self._child_fd = None
-        if mode.find('a') >= 0:
+        self._read_fh = None
+        self._write_fh = None
+        self._child_fds_to_close = []
+        if 'a' in mode:
             raise PipettorException("can not specify append mode")
-        if mode.find('r') >= 0:
-            if stdout is not None:
-                raise PipettorException("can not specify stdout with read mode")
-        else:
-            if stdin is not None:
-                raise PipettorException("can not specify stdin with write mode")
+        bidi = '+' in mode
+        read_side = bidi or 'r' in mode
+        write_side = bidi or 'w' in mode
+        if not (read_side or write_side):
+            raise PipettorException("invalid mode '{}': must contain 'r' or 'w'".format(mode))
+        if read_side and stdout is not None:
+            raise PipettorException("can not specify stdout with read mode")
+        if write_side and stdin is not None:
+            raise PipettorException("can not specify stdin with write mode")
 
-        pipe_read_fd, pipe_write_fd = os.pipe()
-        if mode.find('r') >= 0:
-            firstIn = stdin
-            lastOut = pipe_write_fd
-            self._child_fd = pipe_write_fd
-            self._pipeline_fh = open(pipe_read_fd, mode, buffering=buffering,
-                                     encoding=encoding, errors=errors, newline=newline)
-        else:
-            firstIn = pipe_read_fd
-            lastOut = stdout
-            self._child_fd = pipe_read_fd
-            self._pipeline_fh = open(pipe_write_fd, mode, buffering=buffering,
-                                     encoding=encoding, errors=errors, newline=newline)
+        binary = 'b' in mode
+        firstIn = stdin
+        lastOut = stdout
+        if write_side:
+            # pipe: parent writes -> child[0] reads
+            child_in_fd, parent_wfd = os.pipe()
+            firstIn = child_in_fd
+            self._child_fds_to_close.append(child_in_fd)
+            wmode = 'wb' if binary else 'w'
+            self._write_fh = open(parent_wfd, wmode, buffering=buffering,
+                                  encoding=encoding, errors=errors, newline=newline)
+        if read_side:
+            # pipe: child[n] writes -> parent reads
+            parent_rfd, child_out_fd = os.pipe()
+            lastOut = child_out_fd
+            self._child_fds_to_close.append(child_out_fd)
+            rmode = 'rb' if binary else 'r'
+            self._read_fh = open(parent_rfd, rmode, buffering=buffering,
+                                 encoding=encoding, errors=errors, newline=newline)
         super().__init__(cmds, stdin=firstIn, stdout=lastOut, stderr=stderr, env=env,
                          logger=logger, logLevel=logLevel)
         self.start()
-        os.close(self._child_fd)
-        self._child_fd = None
+        for fd in self._child_fds_to_close:
+            os.close(fd)
+        self._child_fds_to_close = []
 
     ### Internal ###
 
+    def _close_write(self):
+        "close parent write fh (EOF to child); safe to call repeatedly"
+        if self._write_fh is not None:
+            if not self._write_fh.closed:
+                try:
+                    self._write_fh.close()
+                except BrokenPipeError:
+                    pass
+            self._write_fh = None
+
+    def _close_read(self):
+        if self._read_fh is not None:
+            if not self._read_fh.closed:
+                self._read_fh.close()
+            self._read_fh = None
+
     def _close(self):
-        if self._pipeline_fh is not None:
-            self._pipeline_fh.close()
-            self._pipeline_fh = None
-        if self._child_fd is not None:
-            os.close(self._child_fd)
-            self._child_fd = None
-
-    def _unsupported(self, name):
-        """from _pyio.py: raise an OSError exception for unsupported operations."""
-        raise UnsupportedOperation("%s.%s() not supported" %
-                                   (self.__class__.__name__, name))
-
-    def _checkClosed(self, msg=None):
-        """Internal: raise a ValueError if file is closed
-        """
-        if self.closed:
-            raise ValueError("I/O operation on closed file."
-                             if msg is None else msg)
+        # order matters: close write first so child sees EOF
+        self._close_write()
+        self._close_read()
+        for fd in self._child_fds_to_close:
+            os.close(fd)
+        self._child_fds_to_close = []
 
     ### Positioning ###
 
-    def seek(self, pos, whence=0):
-        """Changing stream position not supported"""
-        self._unsupported("seek")
+    # seek / seekable / truncate: io.IOBase defaults to UnsupportedOperation.
 
     def tell(self):
         """Return an int indicating the current stream position."""
-        return self._pipeline_fh.tell()
-
-    def truncate(self, pos=None):
-        """Truncate file unsupported"""
-        self._unsupported("truncate")
+        fh = self._read_fh or self._write_fh
+        return fh.tell()
 
     ### Flush and close ###
 
     def flush(self):
-        "Flush the internal I/O buffer."
-        self._pipeline_fh.flush()
+        "Flush the parent write buffer, if any."
+        if self._write_fh is not None:
+            self._write_fh.flush()
+
+    def close_stdin(self):
+        """Half-close: close the parent write side so the child receives EOF
+        on its stdin, while leaving the read side open for draining remaining
+        output.  Only meaningful in bidirectional mode."""
+        self._close_write()
 
     def close(self):
         "wait for process to complete, with an error if it exited non-zero"
@@ -608,70 +645,51 @@ class Popen(Pipeline):
             if self.state is not State.FINISHED:
                 self.wait()
 
-    def __del__(self):
-        """Destructor.  Calls close()."""
-        if self._pipeline_fh is not None:
-            self.close()
+    # __del__ inherited from io.IOBase (calls close())
 
     ### Inquiries ###
 
-    def seekable(self):
-        """Not seekable"""
-        return False
+    # seekable defaults to False via io.IOBase
 
     def readable(self):
         """Return a bool indicating whether object was opened for reading."""
-        return self._pipeline_fh.readable()
+        return self._read_fh is not None and self._read_fh.readable()
 
     def writable(self):
         """Return a bool indicating whether object was opened for writing."""
-        return self._pipeline_fh.writable()
+        return self._write_fh is not None and self._write_fh.writable()
 
     @property
     def closed(self):
-        """closed: bool.  True if the file has been closed."""
-        if self._pipeline_fh is None:
-            return True
-        else:
-            return self._pipeline_fh.closed
+        """closed: bool.  True if both sides have been closed."""
+        read_closed = self._read_fh is None or self._read_fh.closed
+        write_closed = self._write_fh is None or self._write_fh.closed
+        return read_closed and write_closed
 
-    ### Context manager ###
-
-    def __enter__(self):
-        "support for with statement"
-        self._checkClosed()
-        return self
-
-    def __exit__(self, type, value, traceback):
-        "support for with statement"
-        self.close()
+    # __enter__ / __exit__ / isatty inherited from io.IOBase.
 
     ### Lower-level APIs ###
 
     def fileno(self):
         "get the integer OS-dependent file handle"
-        return self._pipeline_fh.fileno()
-
-    def isatty(self):
-        """Return a bool indicating whether this is an 'interactive' stream.
-        """
-        self._checkClosed()
-        return False
+        if self._read_fh is not None and self._write_fh is not None:
+            self._unsupported("fileno (ambiguous in bidirectional mode)")
+        fh = self._read_fh or self._write_fh
+        return fh.fileno()
 
     ### read, write and readline[s] and writelines ###
 
     def read(self, size=-1):
-        return self._pipeline_fh.read(size)
+        return self._read_fh.read(size)
 
     def readline(self, size=-1):
-        return self._pipeline_fh.readline(size)
+        return self._read_fh.readline(size)
 
-    def readlines(self, size=-1):
-        return self._pipeline_fh.readlines(size)
+    # readlines / writelines inherited from io.IOBase (call readline / write).
 
     def __iter__(self):
         "iter over contents of file"
-        yield from self._pipeline_fh
+        yield from self._read_fh
         # reached the end, now close.  This will result
         # in better errors with "for line in Popen(...)"
         # idiom.
@@ -679,15 +697,7 @@ class Popen(Pipeline):
 
     def write(self, str):
         "Write string str to file."
-        self._pipeline_fh.write(str)
-
-    def writelines(self, lines):
-        """Write a list of lines to the stream.
-
-        Line separators are not added, so it is usual for each of the lines
-        provided to have a line separator at the end.
-        """
-        self._pipeline_fh.writelines(lines)
+        self._write_fh.write(str)
 
     ### not part of file-like ###
 

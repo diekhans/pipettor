@@ -6,7 +6,9 @@ Change Log
 1.3.0 (in progress)
 -------------------
 * Support for passing environment to processes.
-* Fixed 'for line in Popen(...)' idiom always generating error do to premature close.
+* Fixed 'for line in Popen(...)' idiom always generating error due to premature close.
+* Added bidirectional interleaved I/O to Popen() where the caller can both write-to and
+  read-from a subprocess without deadlocking.
 
 1.2.1 (2025-06-30)
 ------------------

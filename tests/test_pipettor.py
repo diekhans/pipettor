@@ -477,6 +477,49 @@ def test_popen_read_as_ascii_replace(request):
     assert ['Microtubules are assembled from dimers of a- and \xc3\x9f-tubulin.'] == lines
     orphan_checks(nopen)
 
+def test_popen_bidi_write_then_read():
+    # write all input, close_stdin, drain all output
+    nopen = ts.get_num_open_files()
+    with Popen([("cat", "-u"), ("cat", "-u")], "r+") as pl:
+        for i in range(20):
+            pl.write(f"line{i}\n")
+        pl.close_stdin()
+        got = list(pl)
+    assert got == [f"line{i}\n" for i in range(20)]
+    orphan_checks(nopen)
+
+def test_popen_bidi_interleaved():
+    # interleaved write+readline; cat -u keeps 1:1 so no deadlock
+    nopen = ts.get_num_open_files()
+    got = []
+    with Popen([("cat", "-u"), ("cat", "-u")], "r+", buffering=1) as pl:
+        for i in range(20):
+            pl.write(f"line{i}\n")
+            got.append(pl.readline())
+        pl.close_stdin()
+        assert pl.read() == ""
+    assert got == [f"line{i}\n" for i in range(20)]
+    orphan_checks(nopen)
+
+def test_popen_bidi_binary():
+    # binary bidi roundtrip
+    nopen = ts.get_num_open_files()
+    payload = bytes(range(256))
+    with Popen(("cat",), "rb+") as pl:
+        pl.write(payload)
+        pl.close_stdin()
+        got = pl.read()
+    assert got == payload
+    orphan_checks(nopen)
+
+def test_popen_bidi_rejects_stdin():
+    with pytest.raises(PipettorException, match="can not specify stdin with write mode"):
+        Popen(("cat",), "r+", stdin="/dev/null")
+
+def test_popen_bidi_rejects_stdout():
+    with pytest.raises(PipettorException, match="can not specify stdout with read mode"):
+        Popen(("cat",), "r+", stdout="/dev/null")
+
 def test_env_passing():
     env = dict(os.environ)
     env['PIPETTOR'] = "YES"

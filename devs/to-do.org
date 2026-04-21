@@ -4,3 +4,23 @@
 to implement file-like objects instead of having copies.
 Hard part here is because of different classes
 for text vs binary.
+* mixed binary/text sides for Popen bidi mode (r+/w+)
+Currently ='b' in mode= applies to both the parent write and parent
+read sides of a bidirectional Popen.  Some use cases want independent
+text/binary (and by extension independent =buffering=, =encoding=,
+=errors=, =newline=) on each side: e.g. send raw bytes, receive text
+JSON.  Options considered:
+
+- *A — per-side kwargs.*  Add =stdin_binary=/=stdout_binary= (and
+  matching encoding, errors, newline, buffering).  Explicit but bloats
+  the Popen signature.
+- *B — open-kwargs dict per side.*  Pass one dict per side:
+  =stdin_open={"encoding": "utf-8"}=, =stdout_open={"mode": "rb"}=.
+  Fewer kwargs, more opaque.
+- *C — escape hatch (current).*  Popen bidi only supports uniform
+  =b=-in-mode.  For mixed, drop to =Pipeline= with =StreamReader= and
+  =StreamWriter=, which already accept independent =binary=,
+  =buffering=, =encoding=, =errors=, =newline=.  Document this.
+
+Chose C for now: keep Popen the simple wrapper, let Stream* cover the
+advanced case.  Revisit if a concrete use case argues for A or B.
