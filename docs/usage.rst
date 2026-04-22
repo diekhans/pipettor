@@ -42,10 +42,9 @@ Bidirectional (interleaved read/write) pipelines are created with
 mode ``'r+'`` (or ``'w+'``, or ``'rb+'`` for binary).  Neither
 ``stdin`` nor ``stdout`` may be given; both are connected to the
 ``Popen`` object and accessed with the usual file-like methods.
-Background threads bridge the kernel pipes to in-process queues so
-interleaved writes and reads do not deadlock on a full pipe buffer.
-When finished writing, call :meth:`pipettor.Popen.close_stdin` so the
-child sees EOF::
+I/O is asynchronous, so writes and reads can be freely interleaved
+without risk of deadlock.  When finished writing, call
+:meth:`pipettor.Popen.close_stdin` so the child sees EOF::
 
     import pipettor
     with pipettor.Popen([("cat", "-u"), ("cat", "-u")], "r+") as pl:
@@ -56,8 +55,9 @@ child sees EOF::
         pl.close_stdin()
         tail = pl.read()          # drain any remaining output
 
-The queue is unbounded by default; pass ``max_queue=N`` to cap the
-number of buffered items when the producer may outrun the consumer.
+In-memory buffering is unbounded by default; pass ``max_queue=N`` to
+cap the items buffered per direction when one side may vastly outrun
+the other.
 
 For mixed binary/text on the two sides, build a :class:`pipettor.Pipeline`
 directly with :class:`pipettor.StreamReader` and
@@ -88,8 +88,7 @@ through `shlex.split` to split them into arguments::
 
 Full control of process pipelines can be achieved using :class:`pipettor.Pipeline`
 class directly.  The :class:`pipettor.DataReader` and :class:`pipettor.DataWriter`
-classes (in-memory accumulator / buffered source) and the
+classes (in-memory accumulator / source) and the
 :class:`pipettor.StreamReader` and :class:`pipettor.StreamWriter` classes
-(file-like read/write with a threaded queue bridge) all use background threads,
-allowing for both reading and writing to a process without risk of deadlocking
-on a full kernel pipe buffer.
+(file-like read/write) all do their I/O asynchronously, so reading and writing
+to the same pipeline is safe from deadlock.

@@ -791,6 +791,7 @@ def test_stream_binary():
     assert sr.read() == payload
     pl.wait()
 
+
 ###
 # Encoding tests
 ###
@@ -870,12 +871,12 @@ def test_popen_encoding_utf8():
         assert pl.read() == _UNICODE_TEXT
 
 def test_popen_encoding_latin1_roundtrip():
+    # ß is latin-1 encodable; é also is, but use a latin-1-safe string
+    text = "ß only\n"
     with Popen(("cat",), "r+", encoding="latin-1") as pl:
-        text = "ß and é-ish\n"  # é not encodable in latin-1 — guard:
-        # filter to latin-1 safe only
-        pl.write("ß only\n")
+        pl.write(text)
         pl.close_stdin()
-        assert pl.read() == "ß only\n"
+        assert pl.read() == text
 
 def test_popen_encoding_mismatch_errors():
     # utf-8 bytes decoded as ascii/strict raises in the reader thread

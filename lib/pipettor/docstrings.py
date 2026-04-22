@@ -11,18 +11,16 @@ doc_cmd_std_args = """\
     list of such lists for a pipeline. Arguments are converted to strings.
 :param stdin: Input to the first process. Can be None (inherit),
     filename, file-like object, file descriptor, a :class:`pipettor.File`
-    object, a :class:`pipettor.DataWriter` object (one-shot buffer or
-    iterable), or a :class:`pipettor.StreamWriter` object (file-like
-    write interface with a threaded queue bridge).
+    object, a :class:`pipettor.DataWriter` (in-memory data or iterable),
+    or a :class:`pipettor.StreamWriter` (file-like write interface).
 :param stdout: Output from the last process. Can be None (inherit), a
     filename, file-like object, file descriptor, a :class:`pipettor.File`
-    object, a :class:`pipettor.DataReader` object (in-memory
-    accumulator), or a :class:`pipettor.StreamReader` object (file-like
-    read interface with a threaded queue bridge).
+    object, a :class:`pipettor.DataReader` (collects output in memory),
+    or a :class:`pipettor.StreamReader` (file-like read interface).
 :param stderr: stderr for the pipeline. Can be None (inherit), a
     filename, file-like object, file descriptor, a :class:`pipettor.File`
-    object, a :class:`pipettor.DataReader` object, or a
-    :class:`pipettor.StreamReader` object. It may also be the class
+    object, a :class:`pipettor.DataReader`, or a
+    :class:`pipettor.StreamReader`. It may also be the class
     :class:`pipettor.DataReader` itself.  See discussion below.
 :param env: mapping that defines environment for process.  If None, the
     current environment is inherited.

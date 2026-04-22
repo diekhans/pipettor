@@ -101,13 +101,24 @@ class DataReader(Dev):
 
     A reader maybe read from multiple process.
     """
+
+    binary: bool
+    "True if data is bytes, False if str"
+    buffering: int
+    "buffer size (-1 platform default, 0 unbuffered, 1 line-buffered)"
+    encoding: "str | None"
+    "text encoding name (None for the platform default)"
+    errors: "str | None"
+    "how decoding errors are handled (``strict``, ``replace``, ``backslashreplace``, ...)"
+    newline: "str | None"
+    "newline translation mode (None = universal, ``''`` = disabled, or a specific terminator)"
+
     def __init__(self, *, binary=False, buffering=-1, encoding=None, errors=None, newline=None):
         super().__init__()
         self.binary = binary
         self._threads = []
         self._buffer = []
         self._lock = threading.Lock()
-        self.binary = binary
         self.buffering = buffering
         self.encoding = encoding
         self.errors = errors
@@ -243,6 +254,11 @@ class File(Dev):
     """A file path for input or output, used for specifying stdio associated
     with files. Mode is one of `r`, `w`, or `a`"""
 
+    path: str
+    "filesystem path of the file"
+    mode: str
+    "open mode, one of ``'r'``, ``'w'``, ``'a'``"
+
     def __init__(self, path, mode="r"):
         super().__init__()
         self.path = path
@@ -286,24 +302,31 @@ class File(Dev):
 class _StreamDev(Dev, io.IOBase):
     """Shared base for :class:`StreamReader` and :class:`StreamWriter`.
 
-    A pipe is created when the device is bound to a process; the
-    parent-side end is opened as a file-like object.  A background
-    thread bridges that file handle and an in-process queue so that
-    the user's read/write calls do not race the kernel pipe buffer:
-    the pipe is always drained/filled by the thread regardless of
-    when the user consumes or produces.  This makes fully interleaved
-    bidirectional use deadlock-free (at the cost of buffering through
-    the queue).
+    Provides a file-like parent-side endpoint of a pipe to a child
+    process.  I/O is asynchronous, so the caller's reads and writes
+    never have to keep up with the child and fully interleaved
+    bidirectional use is safe from deadlock.
 
-    ``max_queue`` bounds the queue size (items, not bytes); ``0`` (the
-    default) is unbounded.  A bounded queue is needed only when the
-    producer can vastly outrun the consumer and buffered memory
-    growth must be limited; in that case the writer's ``write`` or
-    the reader thread's ``put`` will block until the consumer catches
-    up, re-introducing a cooperative form of back-pressure.
+    ``max_queue`` caps the number of items buffered for the caller
+    (``0`` = unbounded).  Set this only when the producer may vastly
+    outrun the consumer and you want to bound buffered memory; the
+    faster side will then block until the slower side catches up.
     """
 
     _EOF = object()
+
+    binary: bool
+    "True for bytes I/O, False for str"
+    buffering: int
+    "buffer size (-1 platform default, 0 unbuffered, 1 line-buffered)"
+    encoding: "str | None"
+    "text encoding name (None for the platform default)"
+    errors: "str | None"
+    "how encoding errors are handled (``strict``, ``replace``, ``backslashreplace``, ...)"
+    newline: "str | None"
+    "newline translation mode (None = universal, ``''`` = disabled, or a specific terminator)"
+    max_queue: int
+    "cap on items buffered for the caller (0 = unbounded)"
 
     def __init__(self, *, binary=False, buffering=-1, encoding=None, errors=None, newline=None, max_queue=0):
         super().__init__()
@@ -366,23 +389,18 @@ class _StreamDev(Dev, io.IOBase):
 class StreamReader(_StreamDev):
     """A file-like object for reading pipeline stdout in the parent.
 
-    Bound as the ``stdout`` of a :class:`Pipeline`.  A background
-    thread reads the child's output from the kernel pipe into a
-    queue; the parent's ``read``/``readline``/``__iter__`` pull from
-    that queue.  Because the thread keeps the pipe drained, the child
-    never blocks on a full stdout pipe regardless of the parent's
-    read cadence.
-
-    ``binary`` selects bytes vs str; ``buffering``, ``encoding``,
-    ``errors``, and ``newline`` are as in :func:`open`.  ``max_queue``
-    bounds the in-memory buffer (items).
+    Bound as the ``stdout`` of a :class:`Pipeline`.  Use the standard
+    file-like methods (``read``, ``readline``, ``__iter__``, ...) to
+    consume the child's output.  Output is read asynchronously, so
+    the child never blocks waiting for the caller to read.
     """
 
     _READ_CHUNK = 8192
 
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-        self._residual = b'' if self.binary else ''
+    def __init__(self, *, binary=False, buffering=-1, encoding=None, errors=None, newline=None, max_queue=0):
+        super().__init__(binary=binary, buffering=buffering, encoding=encoding,
+                         errors=errors, newline=newline, max_queue=max_queue)
+        self._residual = b'' if binary else ''
 
     def __str__(self):
         return "[StreamReader]"
@@ -502,14 +520,12 @@ class StreamReader(_StreamDev):
 class StreamWriter(_StreamDev):
     """A file-like object for writing to pipeline stdin in the parent.
 
-    Bound as the ``stdin`` of a :class:`Pipeline`.  The parent's
-    ``write``/``writelines`` enqueue data; a background thread drains
-    the queue to the kernel pipe.  Because enqueueing does not touch
-    the pipe, the parent never blocks on a full stdin pipe regardless
-    of the child's read cadence.
+    Bound as the ``stdin`` of a :class:`Pipeline`.  Use the standard
+    file-like methods (``write``, ``writelines``) to send data to the
+    child.  Writes are forwarded asynchronously, so the caller never
+    blocks waiting for the child to read.
 
-    Call :meth:`close` after the last write to send EOF to the child;
-    the background thread flushes and closes the underlying pipe.
+    Call :meth:`close` after the last write to send EOF to the child.
     """
 
     def __str__(self):

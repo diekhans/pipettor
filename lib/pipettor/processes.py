@@ -528,15 +528,13 @@ class Popen(Pipeline, io.IOBase):
       Neither ``stdin`` nor ``stdout`` may be given; both are
       connected to the ``Popen`` object.
 
-    All modes are backed by :class:`StreamReader` / :class:`StreamWriter`
-    devices, so background threads bridge the kernel pipes and the
-    caller's :meth:`read` / :meth:`write` calls.  This prevents deadlock
-    from a full kernel pipe buffer even under fully interleaved
-    bidirectional use; the cost is in-memory queueing.  ``max_queue``
-    bounds the per-direction queue (items); ``0`` (default) is unbounded.
+    I/O is asynchronous: :meth:`read` and :meth:`write` are safe to
+    interleave on the same ``Popen``, including in bidirectional mode,
+    without risk of deadlock.  ``max_queue`` caps the items buffered
+    per direction (``0`` = unbounded).
 
-    For bidirectional use, call :meth:`close_stdin` after the last write
-    to signal EOF to the child, then drain remaining output.
+    For bidirectional use, call :meth:`close_stdin` after the last
+    write to signal EOF to the child, then drain remaining output.
     """   # doc extended below after class creation
 
     def __init__(self, cmds, mode='r', *, stdin=None, stdout=None, stderr=None, env=None, logger=None, logLevel=None,
@@ -576,7 +574,8 @@ class Popen(Pipeline, io.IOBase):
 
     def flush(self):
         "Flush the parent write buffer, if any."
-        # StreamWriter flushes per item in its bridge thread; this is a no-op.
+        # writes are forwarded asynchronously and flushed per item;
+        # nothing for the caller to flush explicitly.
         pass
 
     def close_stdin(self):
@@ -620,9 +619,8 @@ class Popen(Pipeline, io.IOBase):
     ### Lower-level APIs ###
 
     def fileno(self):
-        # Stream* bridges the pipe through a queue, so exposing a raw fd
-        # bypasses the bridge and is not meaningful.
-        raise io.UnsupportedOperation("fileno() not supported on Popen (threaded pipe bridge)")
+        # I/O goes through a background thread; a raw fd would bypass it.
+        raise io.UnsupportedOperation("fileno() not supported on Popen")
 
     ### read, write and readline[s] and writelines ###
 
