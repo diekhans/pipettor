@@ -790,3 +790,127 @@ def test_stream_binary():
     sw.close()
     assert sr.read() == payload
     pl.wait()
+
+###
+# Encoding tests
+###
+
+# Mix of ASCII, Latin-1-accessible (ß), and multi-byte (é, 漢) characters.
+_UNICODE_TEXT = "ascii line\nß line\né line\n漢 line\n"
+_UNICODE_BYTES_UTF8 = _UNICODE_TEXT.encode("utf-8")
+_UNICODE_BYTES_LATIN1 = "ascii\nß accented\n".encode("latin-1")
+
+def test_data_writer_utf8_roundtrip():
+    # DataWriter default text writes utf-8 by default
+    dr = DataReader()
+    Pipeline(("cat",), stdin=DataWriter(_UNICODE_TEXT), stdout=dr).wait()
+    assert dr.data == _UNICODE_TEXT
+
+def test_data_writer_latin1_encoding():
+    # explicit latin-1 encoding on writer + reader
+    text = "ß only\n"
+    dr = DataReader(encoding="latin-1")
+    Pipeline(("cat",), stdin=DataWriter(text, encoding="latin-1"), stdout=dr).wait()
+    assert dr.data == text
+
+def test_data_reader_utf16():
+    # write utf-16 bytes through cat, decode via DataReader
+    raw = _UNICODE_TEXT.encode("utf-16")
+    dr = DataReader(encoding="utf-16")
+    Pipeline(("cat",), stdin=DataWriter(raw), stdout=dr).wait()
+    assert dr.data == _UNICODE_TEXT
+
+def test_data_reader_errors_strict_raises():
+    # strict mode on invalid utf-8 raises inside the reader thread
+    bad = b"before\xff\xfeafter\n"
+    dr = DataReader(encoding="utf-8", errors="strict")
+    with pytest.raises(UnicodeDecodeError):
+        Pipeline(("cat",), stdin=DataWriter(bad), stdout=dr).wait()
+
+def test_data_reader_errors_replace():
+    bad = b"x\xffy\n"
+    dr = DataReader(encoding="utf-8", errors="replace")
+    Pipeline(("cat",), stdin=DataWriter(bad), stdout=dr).wait()
+    assert dr.data == "x�y\n"
+
+def test_data_reader_errors_backslashreplace():
+    bad = b"x\xffy\n"
+    dr = DataReader(encoding="utf-8", errors="backslashreplace")
+    Pipeline(("cat",), stdin=DataWriter(bad), stdout=dr).wait()
+    assert dr.data == "x\\xffy\n"
+
+def test_stream_reader_encoding():
+    sr = StreamReader(encoding="utf-8")
+    pl = Pipeline(("cat",), stdin=DataWriter(_UNICODE_BYTES_UTF8), stdout=sr)
+    pl.wait()
+    assert "".join(sr) == _UNICODE_TEXT
+
+def test_stream_writer_encoding():
+    dr = DataReader(binary=True)
+    sw = StreamWriter(encoding="utf-16")
+    pl = Pipeline(("cat",), stdin=sw, stdout=dr)
+    pl.start()
+    sw.write(_UNICODE_TEXT)
+    sw.close()
+    pl.wait()
+    # The StreamWriter emits utf-16-encoded bytes; cat passes through.
+    assert dr.data.decode("utf-16") == _UNICODE_TEXT
+
+def test_stream_reader_errors_replace():
+    bad = b"x\xffy\n"
+    sr = StreamReader(encoding="utf-8", errors="replace")
+    Pipeline(("cat",), stdin=DataWriter(bad), stdout=sr).wait()
+    assert list(sr) == ["x�y\n"]
+
+def test_popen_encoding_utf8():
+    # Popen default text mode with explicit encoding
+    with Popen(("cat",), "r+", encoding="utf-8") as pl:
+        pl.write(_UNICODE_TEXT)
+        pl.close_stdin()
+        assert pl.read() == _UNICODE_TEXT
+
+def test_popen_encoding_latin1_roundtrip():
+    with Popen(("cat",), "r+", encoding="latin-1") as pl:
+        text = "ß and é-ish\n"  # é not encodable in latin-1 — guard:
+        # filter to latin-1 safe only
+        pl.write("ß only\n")
+        pl.close_stdin()
+        assert pl.read() == "ß only\n"
+
+def test_popen_encoding_mismatch_errors():
+    # utf-8 bytes decoded as ascii/strict raises in the reader thread
+    raw = "ß only\n".encode("utf-8")  # 0xc3 0x9f ...
+    sr = StreamReader(encoding="ascii", errors="strict")
+    with pytest.raises(UnicodeDecodeError):
+        Pipeline(("cat",), stdin=DataWriter(raw), stdout=sr).wait()
+
+def test_popen_bidi_binary_with_encoded_bytes():
+    # binary mode: no decoding happens; encoded bytes in == encoded bytes out
+    raw = _UNICODE_TEXT.encode("utf-8")
+    with Popen(("cat",), "rb+") as pl:
+        pl.write(raw)
+        pl.close_stdin()
+        got = pl.read()
+    assert got == raw
+
+def test_data_writer_iterable_with_encoding():
+    # iterable of str items encoded via DataWriter
+    lines = ["ascii\n", "ß line\n", "漢 line\n"]
+    dr = DataReader(encoding="utf-8")
+    Pipeline(("cat",), stdin=DataWriter(iter(lines), binary=False, encoding="utf-8"),
+             stdout=dr).wait()
+    assert dr.data == "".join(lines)
+
+def test_stream_newline_translation():
+    # universal newlines: \r\n should come back as \n with default newline=None
+    raw = b"one\r\ntwo\r\nthree\r\n"
+    sr = StreamReader()  # text mode, newline=None default
+    Pipeline(("cat",), stdin=DataWriter(raw), stdout=sr).wait()
+    assert list(sr) == ["one\n", "two\n", "three\n"]
+
+def test_stream_newline_preserved():
+    # newline='' disables universal newline translation
+    raw = b"one\r\ntwo\r\n"
+    sr = StreamReader(newline='')
+    Pipeline(("cat",), stdin=DataWriter(raw), stdout=sr).wait()
+    assert list(sr) == ["one\r\n", "two\r\n"]

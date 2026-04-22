@@ -1,9 +1,4 @@
-* more extensive encoding tests
 * is a RLock needed for devices objects?
-* figure out how to used _pyio.py ABS classes for processes.py
-to implement file-like objects instead of having copies.
-Hard part here is because of different classes
-for text vs binary.
 * mixed binary/text sides for Popen bidi mode (r+/w+)
 Currently ='b' in mode= applies to both the parent write and parent
 read sides of a bidirectional Popen.  Some use cases want independent

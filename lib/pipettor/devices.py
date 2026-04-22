@@ -55,6 +55,7 @@ class _ReaderThread:
         self.process = process
         self._readfn = readfn
         self._thread = None
+        self._exc = None
         self.read_fh = self.write_fd = None
         read_fd, self.write_fd = os.pipe()
         mode = "rb" if binary else "r"
@@ -84,7 +85,10 @@ class _ReaderThread:
     def _reader(self):
         "child read thread function"
         assert self.write_fd is None
-        self._readfn(self.read_fh.read())
+        try:
+            self._readfn(self.read_fh.read())
+        except Exception as ex:
+            self._exc = ex
 
 class DataReader(Dev):
     """Object to asynchronously read data from process into memory via a pipe.  A
@@ -127,9 +131,14 @@ class DataReader(Dev):
             thread.post_start_parent()
 
     def close(self):
-        "close pipes and terminate thread"
+        "close pipes and terminate thread; re-raise any exception from the reader thread"
         for thread in self._threads:
             thread.close()
+        for thread in self._threads:
+            if thread._exc is not None:
+                exc = thread._exc
+                thread._exc = None
+                raise exc
 
     def _readfn(self, data):
         "store to buffer"
@@ -400,10 +409,13 @@ class StreamReader(_StreamDev):
                 if not chunk:
                     break
                 self._queue.put(chunk)
-        except (ValueError, OSError) as ex:
-            # ValueError when fh is closed from under us; OSError on
-            # BrokenPipeError etc.  Treat as EOF.
-            if not isinstance(ex, (ValueError, BrokenPipeError)):
+        except BrokenPipeError:
+            pass  # normal EOF
+        except ValueError as ex:
+            # benign: fh was closed under us during shutdown.
+            # real problems (e.g. UnicodeDecodeError, a ValueError subclass)
+            # happen while the fh is still open — propagate those.
+            if self._fh is not None and not self._fh.closed:
                 self._bridge_exc = ex
         except Exception as ex:
             self._bridge_exc = ex
