@@ -39,7 +39,19 @@ Process I/O Classes
    :undoc-members:
    :inherited-members:
    :exclude-members: get_child_read_fd,  get_child_write_fd
-   
+
+.. autoclass:: pipettor.StreamReader
+   :members:
+   :undoc-members:
+   :inherited-members:
+   :exclude-members: get_child_read_fd,  get_child_write_fd
+
+.. autoclass:: pipettor.StreamWriter
+   :members:
+   :undoc-members:
+   :inherited-members:
+   :exclude-members: get_child_read_fd,  get_child_write_fd
+
 .. autoclass:: pipettor.File
    :members:
    :undoc-members:

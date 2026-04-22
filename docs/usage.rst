@@ -77,7 +77,7 @@ Data can be read from pipelines into memory using :class:`pipettor.DataReader` o
     import pipettor
     dr = pipettor.DataReader()
     pipettor.run([("sort", "-u", "/etc/hosts"), ("wc", "-l")], stdout=dr)
-    print dr.data
+    print(dr.data)
 
 The :func:`pipettor.runlex` or :func:`pipettor.runlexout` functions pass string arguments
 through `shlex.split` to split them into arguments::
@@ -87,6 +87,9 @@ through `shlex.split` to split them into arguments::
     out = pipettor.runlexout(["sort -u /etc/hosts", ("wc", "-l")])
 
 Full control of process pipelines can be achieved using :class:`pipettor.Pipeline`
-class directly.  The  :class:`pipettor.DataReader` and :class:`pipettor.DataWriter`
-object create threads, allowing for both reading and writing to a process without
-risk of deadlocking.
+class directly.  The :class:`pipettor.DataReader` and :class:`pipettor.DataWriter`
+classes (in-memory accumulator / buffered source) and the
+:class:`pipettor.StreamReader` and :class:`pipettor.StreamWriter` classes
+(file-like read/write with a threaded queue bridge) all use background threads,
+allowing for both reading and writing to a process without risk of deadlocking
+on a full kernel pipe buffer.
